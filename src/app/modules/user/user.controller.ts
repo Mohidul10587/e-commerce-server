@@ -5,6 +5,7 @@ import sendResponse from '../../../shared/sendResponse';
 import { IUser } from './user.interface';
 import { UserService } from './user.service';
 
+// get all users
 const getUsers = async (req: Request, res: Response) => {
   const result = await UserService.getAllUsers();
 
