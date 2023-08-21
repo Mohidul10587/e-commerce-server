@@ -5,7 +5,28 @@ import sendResponse from '../../../shared/sendResponse';
 import { IUser } from './user.interface';
 import { UserService } from './user.service';
 
-// get all users
+const getMyProfile = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.getMyProfile(req.user);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User's information retrieved successfully",
+    data: result,
+  });
+});
+
+const myProfileUpdate = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.myProfileUpdate(req.user, req.body);
+
+  sendResponse<IUser>(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My profile updated successfully!',
+    data: result,
+  });
+});
+
 const getUsers = async (req: Request, res: Response) => {
   const result = await UserService.getAllUsers();
 
@@ -69,7 +90,7 @@ const updateUser: RequestHandler = catchAsync(
     sendResponse<IUser>(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: 'User updated successfully !',
+      message: 'Student updated successfully !',
       data: result,
     });
   }
@@ -81,4 +102,6 @@ export const UserController = {
   deleteUsers,
   updateUser,
   getSingleUsers,
+  getMyProfile,
+  myProfileUpdate,
 };

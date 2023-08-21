@@ -8,10 +8,10 @@ const createUserZodSchema = z.object({
     }),
     role: z.enum([...role] as [string, ...string[]]),
     name: z.string({
-      required_error: 'Name is required',
+      required_error: 'LastName is required',
     }),
     email: z.string({
-      required_error: 'Email is required',
+      required_error: 'LastName is required',
     }),
   }),
 });
@@ -24,13 +24,37 @@ const updateUserZodSchema = z.object({
       .optional(),
     role: z.enum([...role] as [string, ...string[]]).optional(),
     name: z
-      .string({
-        required_error: 'Name is required',
+      .object({
+        firstName: z
+          .string({
+            required_error: 'FirstName is required',
+          })
+          .optional(),
+        lastName: z
+          .string({
+            required_error: 'LastName is required',
+          })
+          .optional(),
       })
       .optional(),
-    email: z
+    phoneNumber: z
       .string({
-        required_error: 'Email is required',
+        required_error: 'PhoneNumber is required',
+      })
+      .optional(),
+    address: z
+      .string({
+        required_error: 'Address  is required',
+      })
+      .optional(),
+    budget: z
+      .number({
+        required_error: 'Budget  is required',
+      })
+      .optional(),
+    income: z
+      .number({
+        required_error: 'Income  is required',
       })
       .optional(),
   }),

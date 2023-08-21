@@ -1,12 +1,22 @@
+/* eslint-disable no-unused-vars */
 import { Model } from 'mongoose';
 
 export type IUser = {
-  name: string;
-  email: string;
+  _id?: string;
   password: string;
   role: string;
+  name: string;
+  email: string;
 };
 
-export type UserModel = Model<IUser, Record<string, unknown>>;
+export type IUserMethods = {
+  isUserExit(phoneNumber: string): Promise<Partial<IUser> | null>;
+  isPasswordMatched(
+    textPassword: string,
+    hashPassword: string
+  ): Promise<boolean>;
+};
+
+export type UserModel = Model<IUser, Record<string, unknown>, IUserMethods>;
 
 export const role = ['seller', 'buyer'];
