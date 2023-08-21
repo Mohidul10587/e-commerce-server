@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/mohid/Desktop/Personal /Cake and creamy/server/logs/winston/successes/.20c582e926810527983caef74586bd64d3ddbf0e-audit.json",
+    "files": [
+        {
+            "date": 1692582297223,
+            "name": "/home/mohid/Desktop/Personal /Cake and creamy/server/logs/winston/successes/phu-2023-21-08-07-success.log",
+            "hash": "78597e36a72bd3d4b73012089d2ddf1477e0ff8fa98483716b5bca0822ce6e9e"
+        },
+        {
+            "date": 1692590268889,
+            "name": "/home/mohid/Desktop/Personal /Cake and creamy/server/logs/winston/successes/phu-2023-21-08-09-success.log",
+            "hash": "7baf09c5aa8dff2e39e2496198c47d95547d57433aa62c02b35ea49d0c6e9841"
+        }
+    ],
+    "hashType": "sha256"
+}

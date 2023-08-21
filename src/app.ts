@@ -4,7 +4,8 @@ import express, { Application, NextFunction, Request, Response } from 'express';
 import httpStatus from 'http-status';
 import globalErrorHandler from './app/middleware/globalErrorHandler';
 import routes from './app/routes';
-
+import multer from 'multer';
+import mongoose from 'mongoose';
 const app: Application = express();
 
 app.use(cors());
@@ -20,6 +21,31 @@ app.use('/api/v1', routes);
 
 //global error handler
 app.use(globalErrorHandler);
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); // Specify the folder where images will be stored
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  },
+});
+
+export const upload = multer({ storage: storage });
+
+type IImage = {
+  path: string;
+} & mongoose.Document;
+
+export const Image = mongoose.model<IImage>(
+  'Image',
+  new mongoose.Schema({
+    path: String,
+  })
+);
+
+app.use('/uploads', express.static('uploads')); // Serve uploaded images
 
 //handle not found
 app.use((req: Request, res: Response, next: NextFunction) => {

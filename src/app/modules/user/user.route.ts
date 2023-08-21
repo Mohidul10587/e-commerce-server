@@ -11,13 +11,13 @@ router.post(
   UserController.createUser
 );
 router.patch(
-  '/:id',
+  '/update-user/:id',
   validateRequest(UserValidation.updateUserZodSchema),
   UserController.updateUser
 );
 router.get('/', UserController.getUsers);
 router.get('/single-user/:id', UserController.getSingleUsers);
 
-router.delete('/:id', UserController.deleteUsers);
+router.delete('/delete-user/:id', UserController.deleteUsers);
 
 export const UserRoutes = router;
