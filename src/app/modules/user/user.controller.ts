@@ -4,6 +4,31 @@ import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 import { IUser } from './user.interface';
 import { UserService } from './user.service';
+import ApiError from '../../../errors/ApiError';
+import { jwtHelpers } from '../../../helpers/jwtHelpers';
+import config from '../../../config';
+import { JwtPayload } from 'jsonwebtoken';
+
+const getCurrentUser = catchAsync(async (req: Request, res: Response) => {
+  // Get token
+  const token = req.headers.authorization;
+  if (!token) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'You are not authorized!');
+  }
+
+  // Verify token
+  const verifyUser = jwtHelpers.verifyToken(token, config.jwt.secret as string);
+
+  //   Set verified user for next middleware
+  const { userId, role } = verifyUser as JwtPayload;
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User's information retrieved successfully",
+    data: userId,
+  });
+});
 
 const getMyProfile = catchAsync(async (req: Request, res: Response) => {
   const result = await UserService.getMyProfile(req.user);
@@ -104,4 +129,5 @@ export const UserController = {
   getSingleUsers,
   getMyProfile,
   myProfileUpdate,
+  getCurrentUser,
 };

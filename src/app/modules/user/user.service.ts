@@ -9,37 +9,37 @@ const getMyProfile = async (payload: JwtPayload) => {
   return result;
 };
 
-const myProfileUpdate = async (
-  verifyUser: JwtPayload,
-  payload: Partial<IUser>
-): Promise<IUser | null> => {
-  const exitUser = await User.findById(verifyUser.userId);
-  if (!exitUser) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
-  }
+// const myProfileUpdate = async (
+//   verifyUser: JwtPayload,
+//   payload: Partial<IUser>
+// ): Promise<IUser | null> => {
+//   const exitUser = await User.findById(verifyUser.userId);
+//   if (!exitUser) {
+//     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+//   }
 
-  // Check user is seller. can't update income and budget
-  if (payload.budget || payload.income || payload.role) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "You can't not update income, budget and role"
-    );
-  }
+//   // Check user is seller. can't update income and budget
+//   if (payload.budget || payload.income || payload.role) {
+//     throw new ApiError(
+//       httpStatus.BAD_REQUEST,
+//       "You can't not update income, budget and role"
+//     );
+//   }
 
-  const { name, ...userData } = payload;
+//   const { name, ...userData } = payload;
 
-  // Dynamic name handling
-  if (name && Object.keys(name).length > 0) {
-    Object.keys(name).forEach(key => {
-      exitUser.name[key as keyof typeof name] = name[key as keyof typeof name];
-    });
-  }
+//   // Dynamic name handling
+//   if (name && Object.keys(name).length > 0) {
+//     Object.keys(name).forEach(key => {
+//       exitUser.name[key as keyof typeof name] = name[key as keyof typeof name];
+//     });
+//   }
 
-  Object.assign(exitUser, userData);
+//   Object.assign(exitUser, userData);
 
-  const result = await exitUser.save();
-  return result;
-};
+//   const result = await exitUser.save();
+//   return result;
+// };
 
 // get all users
 const getAllUsers = async () => {
@@ -108,5 +108,5 @@ export const UserService = {
   updateUser,
   getSingleUsers,
   getMyProfile,
-  myProfileUpdate,
+  // myProfileUpdate,
 };

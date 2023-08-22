@@ -15,6 +15,12 @@ const router = express.Router();
 // );
 
 router.get(
+  '/current_user',
+  // auth(ENUM_USER_ROLE.BUYER, USER_ROLE.SELLER),
+  UserController.getCurrentUser
+);
+
+router.get(
   '/my-profile',
   // auth(ENUM_USER_ROLE.BUYER, USER_ROLE.SELLER),
   UserController.getMyProfile
