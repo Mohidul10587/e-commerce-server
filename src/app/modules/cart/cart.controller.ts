@@ -29,21 +29,21 @@ const addProduct: RequestHandler = catchAsync(
   }
 );
 
-// const getAllProducts: RequestHandler = catchAsync(
-//   async (req: Request, res: Response) => {
-//     const filters = pick(req.query, cowFilterableFields);
+const getAllCartProducts: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    // const filters = pick(req.query, cowFilterableFields);
 
-//     // const paginationOptions = pick(req.query, paginationFields);
+    // const paginationOptions = pick(req.query, paginationFields);
 
-//     const results = await ProductService.getAllProducts(filters);
-//     sendResponse(res, {
-//       statusCode: httpStatus.OK,
-//       success: true,
-//       message: 'Successfully retrieve Cows',
-//       data: results,
-//     });
-//   }
-// );
+    const results = await CartService.getAllCartProducts();
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Successfully retrieve Cows',
+      data: results,
+    });
+  }
+);
 
 // const getSingleProduct: RequestHandler = catchAsync(
 //   async (req: Request, res: Response) => {
@@ -89,6 +89,6 @@ const addProduct: RequestHandler = catchAsync(
 
 export const CartController = {
   addProduct,
-  // getAllProducts,
+  getAllCartProducts,
   // getSingleProduct,
 };

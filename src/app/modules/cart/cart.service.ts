@@ -41,37 +41,12 @@ const addProduct = async (payload: ICartProduct) => {
   return result;
 };
 
-// const getAllProducts = async (filters: IProductFilters) => {
-//   const { searchTerm, ...filtersData } = filters;
-//   const andConditions = [];
-
-//   if (searchTerm) {
-//     andConditions.push({
-//       $or: cowSearchableFields.map(field => ({
-//         [field]: {
-//           $regex: searchTerm,
-//           $options: 'i',
-//         },
-//       })),
-//     });
-//   }
-
-//   if (Object.keys(filtersData).length) {
-//     andConditions.push({
-//       $and: Object.entries(filtersData).map(([field, value]) => ({
-//         [field]: value,
-//       })),
-//     });
-//   }
-
-//   const whereConditions =
-//     andConditions.length > 0 ? { $and: andConditions } : {};
-//   const result = await Product.find(whereConditions);
-
-//   return {
-//     data: result,
-//   };
-// };
+const getAllCartProducts = async () => {
+  const result = await CartProduct.find({})
+    .populate('product')
+    .populate('buyer');
+  return result;
+};
 
 // const getSingleProduct = async (id: string) => {
 //   const result = await Product.findOne({ _id: Object(id) });
@@ -79,6 +54,7 @@ const addProduct = async (payload: ICartProduct) => {
 //   console.log(result);
 //   return result;
 // };
+
 // const deleteCow = async (id: string) => {
 //   const isExist = await Product.findOne({ _id: Object(id) });
 
@@ -115,7 +91,7 @@ const addProduct = async (payload: ICartProduct) => {
 
 export const CartService = {
   addProduct,
-  // getAllProducts,
+  getAllCartProducts,
   // deleteCow,
   // getSingleProduct,
   // updateCow,
