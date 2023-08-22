@@ -6,18 +6,26 @@ import httpStatus from 'http-status';
 import { AuthService } from './auth.service';
 import { ILoginResponse } from './auth.interface';
 import config from '../../../config';
-import { IUser } from '../user/user.interface';
 
 // signup a user
-
+// controller code
 const signup = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.signup(req.body);
 
-  sendResponse<IUser>(res, {
+  const { refreshToken, ...others } = result;
+  // refresh token set into cookies
+  const options = {
+    secure: config.env === 'production',
+    httpOnly: true,
+  };
+
+  res.cookie('refreshToken', refreshToken, options);
+
+  sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Users created successfully!',
-    data: result,
+    data: others,
   });
 });
 

@@ -11,17 +11,43 @@ import { jwtHelpers } from '../../../helpers/jwtHelpers';
 import { User } from '../user/user.model';
 
 // sign up a user
-
-const signup = async (payload: IUser): Promise<IUser | null> => {
+// service code
+const signup = async (
+  payload: IUser
+): Promise<{
+  user: IUser | null;
+  accessToken: string;
+  refreshToken: string;
+}> => {
   const result = await User.create(payload);
-  return result;
+
+  // generate access and refresh token
+  const { _id, role } = result;
+  const accessToken = jwtHelpers.createToken(
+    {
+      userId: _id,
+      role: role,
+    },
+    config.jwt.secret as Secret,
+    config.jwt.expires_in as string
+  );
+  const refreshToken = jwtHelpers.createToken(
+    {
+      userId: _id,
+      role: role,
+    },
+    config.jwt.refresh_secret as Secret,
+    config.jwt.refresh_expires_in as string
+  );
+
+  return { user: result, accessToken, refreshToken };
 };
 
 // log in a user
 const loginUser = async (payload: ILoginUser): Promise<ILoginResponse> => {
   // Check user exit's
   const user = new User();
-  const userData = await user.isUserExit(payload.phoneNumber);
+  const userData = await user.isUserExit(payload.email);
   if (!userData) {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
   }

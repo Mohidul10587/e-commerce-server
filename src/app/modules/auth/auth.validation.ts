@@ -3,7 +3,7 @@ import { z } from 'zod';
 // log in zod schema
 const loginZodSchema = z.object({
   body: z.object({
-    phoneNumber: z.string({
+    email: z.string({
       required_error: 'Phone number is required!',
       invalid_type_error: 'Phone number is invalid!',
     }),

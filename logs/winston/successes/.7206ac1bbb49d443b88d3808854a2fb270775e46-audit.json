@@ -1,0 +1,40 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/mohid/Desktop/Personal /Cake and creamy/server2/logs/winston/successes/.7206ac1bbb49d443b88d3808854a2fb270775e46-audit.json",
+    "files": [
+        {
+            "date": 1692694619871,
+            "name": "/home/mohid/Desktop/Personal /Cake and creamy/server2/logs/winston/successes/phu-2023-22-08-14-success.log",
+            "hash": "39f862f2806898c683792e9484544b6c27a646f35f5a93781b783e29716fab04"
+        },
+        {
+            "date": 1692699997446,
+            "name": "/home/mohid/Desktop/Personal /Cake and creamy/server2/logs/winston/successes/phu-2023-22-08-16-success.log",
+            "hash": "1fe489e27e569617110b4f134e2184321967e6f01a23aeb587e1c0fe774f9f10"
+        },
+        {
+            "date": 1692702062099,
+            "name": "/home/mohid/Desktop/Personal /Cake and creamy/server2/logs/winston/successes/phu-2023-22-08-17-success.log",
+            "hash": "5d64a62136a8055ef6b2b9cdae9843a74bce2c5057f02483ddc69956e4b1b57e"
+        },
+        {
+            "date": 1692707801566,
+            "name": "/home/mohid/Desktop/Personal /Cake and creamy/server2/logs/winston/successes/phu-2023-22-08-18-success.log",
+            "hash": "16176db823a5e2ecb687f82f009b6ebcae7ebaeba378ac7e70987c321632bb49"
+        },
+        {
+            "date": 1692710190146,
+            "name": "/home/mohid/Desktop/Personal /Cake and creamy/server2/logs/winston/successes/phu-2023-22-08-19-success.log",
+            "hash": "ac0fd68c15758bc1920e5754ece9f60e301939567b299ad3045579d4fd2fb3d9"
+        },
+        {
+            "date": 1692712881303,
+            "name": "/home/mohid/Desktop/Personal /Cake and creamy/server2/logs/winston/successes/phu-2023-22-08-20-success.log",
+            "hash": "901f7caea62a03d916c1b9fb63d20a5be8e78729624db5eaaa36c53fce9c6db9"
+        }
+    ],
+    "hashType": "sha256"
+}

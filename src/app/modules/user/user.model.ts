@@ -33,9 +33,9 @@ const userSchema = new Schema(
 
 // Check user exit's
 userSchema.methods.isUserExit = async function (
-  phoneNumber: string
+  email: string
 ): Promise<Partial<IUser> | null> {
-  return await User.findOne({ phoneNumber }, { role: 1, password: 1 });
+  return await User.findOne({ email }, { role: 1, password: 1 });
 };
 
 // check or compare password
