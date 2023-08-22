@@ -44,7 +44,6 @@ const getAllProducts = async (filters: IProductFilters) => {
 const getSingleProduct = async (id: string) => {
   const result = await Product.findOne({ _id: Object(id) });
 
-  console.log(result);
   return result;
 };
 const deleteCow = async (id: string) => {

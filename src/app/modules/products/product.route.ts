@@ -17,7 +17,7 @@ router.get('/', ProductController.getAllProducts);
 
 router.get(
   '/single-product/:id',
-  auth(ENUM_USER_ROLE.BUYER),
+  // auth(ENUM_USER_ROLE.BUYER),
   ProductController.getSingleProduct
 );
 // router.patch(
