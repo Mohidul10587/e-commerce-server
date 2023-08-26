@@ -12,7 +12,7 @@ router.post(
   CartController.addProduct
 );
 
-router.get('/', CartController.getAllCartProducts);
+router.get('/:userId', CartController.getAllCartProducts);
 // // router.delete('/delete-cow/:id', CowController.deleteCow);
 
 // router.get(

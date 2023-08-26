@@ -7,20 +7,20 @@ import routes from './app/routes';
 import multer from 'multer';
 import mongoose from 'mongoose';
 const app: Application = express();
-
 app.use(
   cors({
     origin: 'http://localhost:3000',
     credentials: true,
   })
 );
+
 app.use(cookieParser());
 
 //parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// app.use('/api/v1/users/', UserRoutes);
+// app.use('/api/v1/users/', UserRoutes);fdfdfdff
 // app.use('/api/v1/academic-semesters', AcademicSemesterRoutes);
 app.use('/api/v1', routes);
 

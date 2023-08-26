@@ -1,0 +1,25 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/mohid/Desktop/Personal /HappyShop/server2/logs/winston/errors/.275563fccafe752bbbc5461d03aeeb9565fc217d-audit.json",
+    "files": [
+        {
+            "date": 1693058095393,
+            "name": "/home/mohid/Desktop/Personal /HappyShop/server2/logs/winston/errors/phu-2023-26-08-19-error.log",
+            "hash": "30a94d032292168fcbe87d59e3112fdf7fe77f81179d851ac8560897b540db76"
+        },
+        {
+            "date": 1693066323166,
+            "name": "/home/mohid/Desktop/Personal /HappyShop/server2/logs/winston/errors/phu-2023-26-08-22-error.log",
+            "hash": "90b15191b09d19d4e141b7881fe52e868e8ecca7e436f9a247647c26d566216f"
+        },
+        {
+            "date": 1693069832208,
+            "name": "/home/mohid/Desktop/Personal /HappyShop/server2/logs/winston/errors/phu-2023-26-08-23-error.log",
+            "hash": "a96a1f1ecf4fd268dc129cd322f5443d66a0e86c76460674dc44da1df0fdb631"
+        }
+    ],
+    "hashType": "sha256"
+}

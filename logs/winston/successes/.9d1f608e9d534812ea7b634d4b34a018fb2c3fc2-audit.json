@@ -1,0 +1,25 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/mohid/Desktop/Personal /HappyShop/server2/logs/winston/successes/.9d1f608e9d534812ea7b634d4b34a018fb2c3fc2-audit.json",
+    "files": [
+        {
+            "date": 1693058095360,
+            "name": "/home/mohid/Desktop/Personal /HappyShop/server2/logs/winston/successes/phu-2023-26-08-19-success.log",
+            "hash": "816dab198cb91cf200499b52b4a07f419dc37cf2b3deff5a5e6ba40bcd064453"
+        },
+        {
+            "date": 1693066323130,
+            "name": "/home/mohid/Desktop/Personal /HappyShop/server2/logs/winston/successes/phu-2023-26-08-22-success.log",
+            "hash": "d961e9b6fafa19a9ce910526d68323f6b34bbf68db3a2040fdc85700886bb72f"
+        },
+        {
+            "date": 1693069832178,
+            "name": "/home/mohid/Desktop/Personal /HappyShop/server2/logs/winston/successes/phu-2023-26-08-23-success.log",
+            "hash": "bbdcea6d930590ad99248eec6335da272317d763552ba45d0026dd64ea8c6bb1"
+        }
+    ],
+    "hashType": "sha256"
+}
