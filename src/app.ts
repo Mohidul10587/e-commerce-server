@@ -9,7 +9,7 @@ import mongoose from 'mongoose';
 const app: Application = express();
 app.use(
   cors({
-    origin: 'https://main--cakencreamy.netlify.app/',
+    origin: 'https://main--cakencreamy.netlify.app',
     credentials: true,
   })
 );
