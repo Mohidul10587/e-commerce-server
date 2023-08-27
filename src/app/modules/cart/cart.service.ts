@@ -41,8 +41,8 @@ const addProduct = async (payload: ICartProduct) => {
   return result;
 };
 
-const getAllCartProducts = async (userId) => {
-  const result = await CartProduct.find({buyer: new Object(userId)})
+const getAllCartProducts = async (userId: string) => {
+  const result = await CartProduct.find({ buyer: Object(userId) })
     .populate('product')
     .populate('buyer');
   return result;

@@ -9,6 +9,7 @@ import mongoose from 'mongoose';
 const app: Application = express();
 app.use(
   cors({
+    // origin: 'http://localhost:3000',
     origin: 'https://main--cakencreamy.netlify.app',
     credentials: true,
   })
