@@ -20,6 +20,11 @@ router.get(
   // auth(ENUM_USER_ROLE.BUYER),
   ProductController.getSingleProduct
 );
+router.delete(
+  '/:id',
+  // auth(ENUM_USER_ROLE.BUYER),
+  ProductController.deleteSingleProduct
+);
 // router.patch(
 //   '/update-cow/:id',
 //   validateRequest(CowValidation.updateCowZodSchema),

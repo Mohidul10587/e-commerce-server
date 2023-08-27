@@ -80,18 +80,18 @@ const getSingleProduct: RequestHandler = catchAsync(
   }
 );
 
-// const deleteCow: RequestHandler = catchAsync(
-//   async (req: Request, res: Response) => {
-//     const id = req.params.id;
-//     const cows = await CowService.deleteCow(id);
-//     sendResponse(res, {
-//       statusCode: httpStatus.OK,
-//       success: true,
-//       message: 'Successfully deleted the Cow',
-//       data: cows,
-//     });
-//   }
-// );
+const deleteSingleProduct: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const id = req.params.id;
+    const cows = await ProductService.deleteSingleProduct(id);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Successfully deleted the Cow',
+      data: cows,
+    });
+  }
+);
 
 // const updateCow: RequestHandler = catchAsync(
 //   async (req: Request, res: Response) => {
@@ -113,4 +113,5 @@ export const ProductController = {
   createProduct,
   getAllProducts,
   getSingleProduct,
+  deleteSingleProduct,
 };
