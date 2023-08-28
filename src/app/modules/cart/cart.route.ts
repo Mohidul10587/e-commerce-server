@@ -13,16 +13,10 @@ router.post(
 );
 
 router.get('/:userId', CartController.getAllCartProducts);
-// // router.delete('/delete-cow/:id', CowController.deleteCow);
 
-// router.get(
-//   '/single-product/:id',
-//   auth(ENUM_USER_ROLE.BUYER),
-//   ProductController.getSingleProduct
-// );
-// router.patch(
-//   '/update-cow/:id',
-//   validateRequest(CowValidation.updateCowZodSchema),
-//   CowController.updateCow
-// );
+router.delete(
+  '/:id',
+  // validateRequest(CartController.updateCowZodSchema),
+  CartController.deleteCartProduct
+);
 export const CartRoutes = router;

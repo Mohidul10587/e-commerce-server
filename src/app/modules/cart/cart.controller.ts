@@ -45,50 +45,21 @@ const getAllCartProducts: RequestHandler = catchAsync(
   }
 );
 
-// const getSingleProduct: RequestHandler = catchAsync(
-//   async (req: Request, res: Response) => {
-//     const id = req.params.id;
-//     const cows = await ProductService.getSingleProduct(id);
-//     sendResponse<IProduct>(res, {
-//       statusCode: httpStatus.OK,
-//       success: true,
-//       message: 'Successfully retrieve Cows',
-//       data: cows,
-//     });
-//   }
-// );
-
-// const deleteCow: RequestHandler = catchAsync(
-//   async (req: Request, res: Response) => {
-//     const id = req.params.id;
-//     const cows = await CowService.deleteCow(id);
-//     sendResponse(res, {
-//       statusCode: httpStatus.OK,
-//       success: true,
-//       message: 'Successfully deleted the Cow',
-//       data: cows,
-//     });
-//   }
-// );
-
-// const updateCow: RequestHandler = catchAsync(
-//   async (req: Request, res: Response) => {
-//     const id = req.params.id;
-//     const updatedData = req.body;
-
-//     const result = await CowService.updateCow(id, updatedData);
-
-//     sendResponse<IProduct>(res, {
-//       statusCode: httpStatus.OK,
-//       success: true,
-//       message: 'Student updated successfully !',
-//       data: result,
-//     });
-//   }
-// );
+const deleteCartProduct: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const id = req.params.id;
+    const deletedOrder = await CartService.deleteCartProduct(id);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Successfully deleted the order',
+      data: deletedOrder,
+    });
+  }
+);
 
 export const CartController = {
   addProduct,
   getAllCartProducts,
-  // getSingleProduct,
+  deleteCartProduct,
 };

@@ -67,5 +67,4 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   });
   next();
 });
-
 export default app;
