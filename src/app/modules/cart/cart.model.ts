@@ -4,13 +4,11 @@ import { CartProductModel, ICartProduct } from './cart.interface';
 const cartProductSchema = new Schema(
   {
     product: {
-      type: Schema.Types.ObjectId,
-      ref: 'Product',
+      type: Object,
       required: true,
     },
     buyer: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
+      type: String,
       required: true,
     },
   },

@@ -11,7 +11,6 @@ import { CartService } from './cart.service';
 const addProduct: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
     const payloads: ICartProduct = req.body;
-    console.log('from controller', payloads);
     try {
       const result = await CartService.addProduct(payloads);
       sendResponse<ICartProduct>(res, {
