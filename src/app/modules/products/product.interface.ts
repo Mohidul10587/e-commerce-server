@@ -31,7 +31,8 @@ export type IProduct = {
   description: string;
   weight: string;
   price: number;
-  image: string | undefined;
+  image: string[] | undefined;
+
   quantity: number;
 };
 

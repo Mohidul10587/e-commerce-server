@@ -36,8 +36,9 @@ const productSchema = new Schema(
       required: true,
     },
     image: {
-      type: String,
+      type: Array,
     },
+
     quantity: {
       type: Number,
       required: true,
