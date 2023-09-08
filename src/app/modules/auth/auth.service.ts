@@ -22,11 +22,12 @@ const signup = async (
   const result = await User.create(payload);
 
   // generate access and refresh token
-  const { _id, role } = result;
+  const { _id, role, name } = result;
   const accessToken = jwtHelpers.createToken(
     {
       userId: _id,
       role: role,
+      name: name,
     },
     config.jwt.secret as Secret,
     config.jwt.expires_in as string
@@ -35,6 +36,7 @@ const signup = async (
     {
       userId: _id,
       role: role,
+      name: name,
     },
     config.jwt.refresh_secret as Secret,
     config.jwt.refresh_expires_in as string
@@ -61,11 +63,12 @@ const loginUser = async (payload: ILoginUser): Promise<ILoginResponse> => {
   }
 
   // generate access and refresh token
-  const { _id, role } = userData;
+  const { _id, role, name } = userData;
   const accessToken = jwtHelpers.createToken(
     {
       userId: _id,
       role: role,
+      name: name,
     },
     config.jwt.secret as Secret,
     config.jwt.expires_in as string
@@ -74,6 +77,7 @@ const loginUser = async (payload: ILoginUser): Promise<ILoginResponse> => {
     {
       userId: _id,
       role: role,
+      name: name,
     },
     config.jwt.refresh_secret as Secret,
     config.jwt.refresh_expires_in as string
@@ -114,6 +118,7 @@ const refreshToken = async (
     {
       userId: user._id,
       role: user.role,
+      name: user.name,
     },
     config.jwt.secret as Secret,
     config.jwt.expires_in as string

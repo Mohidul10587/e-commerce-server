@@ -20,13 +20,16 @@ const getCurrentUser = catchAsync(async (req: Request, res: Response) => {
   const verifyUser = jwtHelpers.verifyToken(token, config.jwt.secret as string);
 
   //   Set verified user for next middleware
-  const { userId, role } = verifyUser as JwtPayload;
-
+  const { userId, name } = verifyUser as JwtPayload;
+  const userData = {
+    userId,
+    name,
+  };
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "User's information retrieved successfully",
-    data: userId,
+    data: userData,
   });
 });
 
