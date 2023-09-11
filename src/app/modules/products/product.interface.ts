@@ -26,13 +26,11 @@ export const category = ['Dairy', 'Beef', 'Dual Purpose'];
 export type IProduct = {
   name: string;
   unit: string;
-  categoryName: string;
-  flavorName: string;
+  category: string;
+  sub_category: string;
   description: string;
-  weight: string;
   price: number;
   image: string[] | undefined;
-
   quantity: number;
 };
 

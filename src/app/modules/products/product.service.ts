@@ -5,6 +5,7 @@ import { Product } from './product.model';
 import { cowSearchableFields } from './product.constant';
 
 const createProduct = async (payloads: IProduct) => {
+  console.log(payloads);
   const result = await Product.create(payloads);
   return result;
 };
