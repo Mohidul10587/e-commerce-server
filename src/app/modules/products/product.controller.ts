@@ -75,8 +75,38 @@ const getAllProducts: RequestHandler = catchAsync(
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: 'Successfully retrieve Cows',
+      message: 'Successfully retrieve Products',
       data: results,
+    });
+  }
+);
+
+const getSingleCategoryProduct: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const categoryName = req.params.categoryName;
+    console.log(categoryName);
+    const result = await ProductService.getSingleCategoryProduct(categoryName);
+    sendResponse<IProduct[]>(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: `Successfully retrieve Products of ${categoryName}`,
+      data: result,
+    });
+  }
+);
+
+const getSingleSubCategoryProduct: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const sub_category = req.params.sub_category;
+
+    const result = await ProductService.getSingleSubCategoryProduct(
+      sub_category
+    );
+    sendResponse<IProduct[]>(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: `Successfully retrieve Products of ${sub_category}`,
+      data: result,
     });
   }
 );
@@ -84,12 +114,12 @@ const getAllProducts: RequestHandler = catchAsync(
 const getSingleProduct: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
     const id = req.params.id;
-    const cows = await ProductService.getSingleProduct(id);
+    const result = await ProductService.getSingleProduct(id);
     sendResponse<IProduct>(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: 'Successfully retrieve Cows',
-      data: cows,
+      message: `Successfully retrieve Products of ${id}`,
+      data: result,
     });
   }
 );
@@ -101,7 +131,7 @@ const deleteSingleProduct: RequestHandler = catchAsync(
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: 'Successfully deleted the Cow',
+      message: 'Successfully deleted the Products',
       data: cows,
     });
   }
@@ -111,5 +141,7 @@ export const ProductController = {
   createProduct,
   getAllProducts,
   getSingleProduct,
+  getSingleCategoryProduct,
   deleteSingleProduct,
+  getSingleSubCategoryProduct,
 };

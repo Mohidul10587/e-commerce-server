@@ -42,6 +42,16 @@ const getAllProducts = async (filters: IProductFilters) => {
   };
 };
 
+const getSingleCategoryProduct = async (categoryName: string) => {
+  const result = await Product.find({ category: categoryName });
+
+  return result;
+};
+const getSingleSubCategoryProduct = async (sub_category: string) => {
+  const result = await Product.find({ sub_category });
+
+  return result;
+};
 const getSingleProduct = async (id: string) => {
   const result = await Product.findOne({ _id: Object(id) });
 
@@ -86,5 +96,7 @@ export const ProductService = {
   getAllProducts,
   deleteSingleProduct,
   getSingleProduct,
+  getSingleCategoryProduct,
+  getSingleSubCategoryProduct,
   updateCow,
 };

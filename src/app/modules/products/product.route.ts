@@ -12,6 +12,7 @@ router.post(
   // validateRequest(CowValidation.createCowZodSchema),
   ProductController.createProduct
 );
+
 router.get('/', ProductController.getAllProducts);
 // router.delete('/delete-cow/:id', CowController.deleteCow);
 
@@ -20,6 +21,17 @@ router.get(
   // auth(ENUM_USER_ROLE.BUYER),
   ProductController.getSingleProduct
 );
+router.get(
+  '/category/:categoryName',
+  // auth(ENUM_USER_ROLE.BUYER),
+  ProductController.getSingleCategoryProduct
+);
+router.get(
+  '/sub_category/:sub_category',
+  // auth(ENUM_USER_ROLE.BUYER),
+  ProductController.getSingleSubCategoryProduct
+);
+
 router.delete(
   '/:id',
   // auth(ENUM_USER_ROLE.BUYER),
