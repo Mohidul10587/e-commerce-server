@@ -38,6 +38,10 @@ const productSchema = new Schema(
       type: Number,
       required: true,
     },
+    brand: {
+      type: String,
+      required: true,
+    },
   },
   {
     timestamps: true,

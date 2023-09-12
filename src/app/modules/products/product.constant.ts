@@ -1,8 +1,8 @@
-export const cowSearchableFields = ['name', 'categoryName', 'flavorName'];
+export const productSearchableFields = ['name'];
 
-export const cowFilterableFields = [
+export const productFilterableFields = [
   'searchTerm',
-  'location',
+  'brand',
   'category',
   'label',
   'breed',

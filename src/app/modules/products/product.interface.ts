@@ -32,11 +32,14 @@ export type IProduct = {
   price: number;
   image: string[] | undefined;
   quantity: number;
+  brand: string;
 };
 
 export type IProductFilters = {
   searchTerm?: string;
   name?: string;
+  brand?: string;
+
   breed?: string;
   category?: string;
   maxPrice?: string;

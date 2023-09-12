@@ -4,7 +4,7 @@ import httpStatus from 'http-status';
 import catchAsync from '../../../shared/catchAsync';
 import pick from '../../../shared/pick';
 import sendResponse from '../../../shared/sendResponse';
-import { cowFilterableFields } from './product.constant';
+import { productFilterableFields } from './product.constant';
 import { IProduct } from './product.interface';
 import { ProductService } from './product.service';
 import multer from 'multer';
@@ -67,10 +67,7 @@ const createProduct: RequestHandler = catchAsync(
 
 const getAllProducts: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
-    const filters = pick(req.query, cowFilterableFields);
-
-    // const paginationOptions = pick(req.query, paginationFields);
-
+    const filters = pick(req.query, productFilterableFields);
     const results = await ProductService.getAllProducts(filters);
     sendResponse(res, {
       statusCode: httpStatus.OK,
@@ -84,9 +81,12 @@ const getAllProducts: RequestHandler = catchAsync(
 const getSingleCategoryProduct: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
     const categoryName = req.params.categoryName;
-    console.log(categoryName);
-    const result = await ProductService.getSingleCategoryProduct(categoryName);
-    sendResponse<IProduct[]>(res, {
+    const filters = pick(req.query, productFilterableFields);
+    const result = await ProductService.getSingleCategoryProduct(
+      categoryName,
+      filters
+    );
+    sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
       message: `Successfully retrieve Products of ${categoryName}`,

@@ -2,7 +2,7 @@ import httpStatus from 'http-status';
 import ApiError from '../../../errors/ApiError';
 import { IProduct, IProductFilters } from './product.interface';
 import { Product } from './product.model';
-import { cowSearchableFields } from './product.constant';
+import { productSearchableFields } from './product.constant';
 
 const createProduct = async (payloads: IProduct) => {
   console.log(payloads);
@@ -16,7 +16,7 @@ const getAllProducts = async (filters: IProductFilters) => {
 
   if (searchTerm) {
     andConditions.push({
-      $or: cowSearchableFields.map(field => ({
+      $or: productSearchableFields.map(field => ({
         [field]: {
           $regex: searchTerm,
           $options: 'i',
@@ -42,11 +42,57 @@ const getAllProducts = async (filters: IProductFilters) => {
   };
 };
 
-const getSingleCategoryProduct = async (categoryName: string) => {
-  const result = await Product.find({ category: categoryName });
+const getSingleCategoryProduct = async (
+  categoryName: string,
+  filters: IProductFilters
+) => {
+  const { searchTerm, brand, ...otherFilters } = filters;
 
-  return result;
+  const andConditions = [];
+
+  if (searchTerm) {
+    andConditions.push({
+      $or: productSearchableFields.map(field => ({
+        [field]: {
+          $regex: searchTerm,
+          $options: 'i',
+        },
+      })),
+    });
+  }
+
+  if (brand) {
+    // Split the brand string into an array of brand names
+    const brandsArray = brand.split(',');
+
+    // Add a condition to filter products by brand using the $in operator
+    andConditions.push({
+      brand: { $in: brandsArray },
+    });
+  }
+
+  if (Object.keys(otherFilters).length) {
+    andConditions.push({
+      $and: Object.entries(otherFilters).map(([field, value]) => ({
+        [field]: value,
+      })),
+    });
+  }
+
+  andConditions.push({
+    category: categoryName,
+  });
+
+  const whereConditions =
+    andConditions.length > 0 ? { $and: andConditions } : {};
+
+  const result = await Product.find(whereConditions);
+
+  return {
+    data: result,
+  };
 };
+
 const getSingleSubCategoryProduct = async (sub_category: string) => {
   const result = await Product.find({ sub_category });
 
