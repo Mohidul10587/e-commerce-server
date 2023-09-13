@@ -2,10 +2,10 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { Application, NextFunction, Request, Response } from 'express';
 import httpStatus from 'http-status';
+import mongoose from 'mongoose';
+import multer from 'multer';
 import globalErrorHandler from './app/middleware/globalErrorHandler';
 import routes from './app/routes';
-import multer from 'multer';
-import mongoose from 'mongoose';
 const app: Application = express();
 app.use(
   cors({
