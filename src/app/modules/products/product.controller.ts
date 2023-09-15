@@ -114,11 +114,12 @@ const getSingleCategoryProduct: RequestHandler = catchAsync(
 const getSingleSubCategoryProduct: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
     const sub_category = req.params.sub_category;
-
+    const filters = pick(req.query, productFilterableFields);
     const result = await ProductService.getSingleSubCategoryProduct(
-      sub_category
+      sub_category,
+      filters
     );
-    sendResponse<IProduct[]>(res, {
+    sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
       message: `Successfully retrieve Products of ${sub_category}`,
