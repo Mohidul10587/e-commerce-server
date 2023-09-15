@@ -9,8 +9,7 @@ import routes from './app/routes';
 const app: Application = express();
 app.use(
   cors({
-    // origin: 'http://localhost:3000',
-    origin: 'https://main--cakencreamy.netlify.app',
+    origin: ['http://localhost:3000', 'https://main--cakencreamy.netlify.app'],
     credentials: true,
   })
 );
