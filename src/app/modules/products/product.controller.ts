@@ -7,8 +7,8 @@ import sendResponse from '../../../shared/sendResponse';
 import { productFilterableFields } from './product.constant';
 import { IProduct } from './product.interface';
 import { ProductService } from './product.service';
-import multer from 'multer';
-import { Express } from 'express';
+// import multer from 'multer';
+// import { Express } from 'express';
 // const storage = multer.diskStorage({
 //   destination: function (req, file, cb) {
 //     cb(null, 'uploads/');
@@ -140,6 +140,21 @@ const getSingleProduct: RequestHandler = catchAsync(
     });
   }
 );
+const updateProduct: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const updatedProduct = req.body;
+    const id = req.params.id;
+
+    console.log(updatedProduct, id);
+    // const result = await ProductService.getSingleProduct(id);
+    sendResponse<IProduct>(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: `Successfully  Product updated`,
+      data: updatedProduct,
+    });
+  }
+);
 
 const deleteSingleProduct: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
@@ -161,4 +176,5 @@ export const ProductController = {
   getSingleCategoryProduct,
   deleteSingleProduct,
   getSingleSubCategoryProduct,
+  updateProduct,
 };

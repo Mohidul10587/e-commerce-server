@@ -30,6 +30,7 @@ export type IProduct = {
   sub_category: string;
   description: string;
   price: number;
+  discount: number;
   image: string[] | undefined;
   quantity: number;
   brand: string;

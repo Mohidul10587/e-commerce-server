@@ -37,9 +37,9 @@ router.delete(
   // auth(ENUM_USER_ROLE.BUYER),
   ProductController.deleteSingleProduct
 );
-// router.patch(
-//   '/update-cow/:id',
-//   validateRequest(CowValidation.updateCowZodSchema),
-//   CowController.updateCow
-// );
+router.patch(
+  '/update-product/:id',
+  // validateRequest(CowValidation.updateCowZodSchema),
+  ProductController.updateProduct
+);
 export const ProductRoutes = router;
