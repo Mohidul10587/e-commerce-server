@@ -187,7 +187,7 @@ const deleteSingleProduct = async (id: string) => {
   return result;
 };
 
-const updateCow = async (id: string, payload: Partial<IProduct>) => {
+const updateProduct = async (payload: Partial<IProduct>, id: string) => {
   const isExist = await Product.findOne({ _id: Object(id) });
 
   if (!isExist) {
@@ -215,5 +215,5 @@ export const ProductService = {
   getSingleProduct,
   getSingleCategoryProduct,
   getSingleSubCategoryProduct,
-  updateCow,
+  updateProduct,
 };

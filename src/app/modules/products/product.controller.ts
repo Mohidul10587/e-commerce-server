@@ -146,12 +146,12 @@ const updateProduct: RequestHandler = catchAsync(
     const id = req.params.id;
 
     console.log(updatedProduct, id);
-    // const result = await ProductService.getSingleProduct(id);
+    const result = await ProductService.updateProduct(updatedProduct, id);
     sendResponse<IProduct>(res, {
       statusCode: httpStatus.OK,
       success: true,
       message: `Successfully  Product updated`,
-      data: updatedProduct,
+      data: result,
     });
   }
 );
