@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { breed, category, label, location } from './product.interface';
+import { breed, category, label, location } from './offerProduct.interface';
 
 const createProductZodSchema = z.object({
   body: z.object({

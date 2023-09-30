@@ -27,5 +27,5 @@ export const CartService = {
   getAllCartProducts,
   deleteCartProduct,
   // getSingleProduct,
-  // updateCow,
+  // updateProduct,
 };

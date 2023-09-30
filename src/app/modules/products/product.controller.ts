@@ -159,12 +159,12 @@ const updateProduct: RequestHandler = catchAsync(
 const deleteSingleProduct: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
     const id = req.params.id;
-    const cows = await ProductService.deleteSingleProduct(id);
+    const products = await ProductService.deleteSingleProduct(id);
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
       message: 'Successfully deleted the Products',
-      data: cows,
+      data: products,
     });
   }
 );

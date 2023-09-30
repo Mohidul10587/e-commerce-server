@@ -4,9 +4,9 @@ import httpStatus from 'http-status';
 import catchAsync from '../../../shared/catchAsync';
 // import pick from '../../../shared/pick';
 import sendResponse from '../../../shared/sendResponse';
-// import { cowFilterableFields } from './product.constant';
-import { OrderService } from './order.service';
+// import { productFilterableFields } from './product.constant';
 import { IOrder } from './order.interface';
+import { OrderService } from './order.service';
 
 const postOrder: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
@@ -29,13 +29,13 @@ const postOrder: RequestHandler = catchAsync(
 
 const getAllOrders: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
-    // const filters = pick(req.query, cowFilterableFields);
+    // const filters = pick(req.query, productFilterableFields);
 
     const results = await OrderService.getOrder();
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: 'Successfully retrieve Cows',
+      message: 'Successfully retrieve Products',
       data: results,
     });
   }

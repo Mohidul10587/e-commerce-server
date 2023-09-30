@@ -25,15 +25,12 @@ export const category = ['Dairy', 'Beef', 'Dual Purpose'];
 
 export type IProduct = {
   name: string;
-  unit: string;
   category: string;
-  sub_category: string;
   description: string;
   price: number;
-  discount: number;
   image: string[] | undefined;
   quantity: number;
-  brand: string;
+  discount: number;
 };
 
 export type IProductFilters = {
@@ -49,4 +46,4 @@ export type IProductFilters = {
   minWeight?: string;
 };
 
-export type ProductModel = Model<IProduct, Record<string, unknown>>;
+export type OfferProductModel = Model<IProduct, Record<string, unknown>>;

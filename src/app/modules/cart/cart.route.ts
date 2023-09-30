@@ -8,7 +8,7 @@ const router = express.Router();
 router.post(
   '/add_product_to_cart',
   auth(ENUM_USER_ROLE.BUYER),
-  // validateRequest(CowValidation.createCowZodSchema),
+  // validateRequest(ProductValidation.createProductZodSchema),
   CartController.addProduct
 );
 
@@ -16,7 +16,7 @@ router.get('/:userId', CartController.getAllCartProducts);
 
 router.delete(
   '/:id',
-  // validateRequest(CartController.updateCowZodSchema),
+  // validateRequest(CartController.updateProductZodSchema),
   CartController.deleteCartProduct
 );
 export const CartRoutes = router;

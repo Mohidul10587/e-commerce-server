@@ -4,7 +4,7 @@ import httpStatus from 'http-status';
 import catchAsync from '../../../shared/catchAsync';
 // import pick from '../../../shared/pick';
 import sendResponse from '../../../shared/sendResponse';
-// import { cowFilterableFields } from './product.constant';
+// import { productFilterableFields } from './product.constant';
 import { ICartProduct } from './cart.interface';
 import { CartService } from './cart.service';
 
@@ -30,7 +30,7 @@ const addProduct: RequestHandler = catchAsync(
 
 const getAllCartProducts: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
-    // const filters = pick(req.query, cowFilterableFields);
+    // const filters = pick(req.query, productFilterableFields);
 
     // const paginationOptions = pick(req.query, paginationFields);
     const userId = req.params.userId;
@@ -38,7 +38,7 @@ const getAllCartProducts: RequestHandler = catchAsync(
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: 'Successfully retrieve Cows',
+      message: 'Successfully retrieve Products',
       data: results,
     });
   }

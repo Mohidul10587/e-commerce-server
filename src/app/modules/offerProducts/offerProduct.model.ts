@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { ProductModel, IProduct } from './product.interface';
+import { OfferProductModel, IProduct } from './offerProduct.interface';
 
 const productSchema = new Schema(
   {
@@ -7,16 +7,8 @@ const productSchema = new Schema(
       type: String,
       required: true,
     },
-    unit: {
-      type: String,
-      required: true,
-    },
-    category: {
-      type: String,
-      required: true,
-    },
 
-    sub_category: {
+    category: {
       type: String,
       required: true,
     },
@@ -30,10 +22,6 @@ const productSchema = new Schema(
       type: Number,
       required: true,
     },
-    discount: {
-      type: Number,
-      required: true,
-    },
     image: {
       type: Array,
     },
@@ -42,8 +30,8 @@ const productSchema = new Schema(
       type: Number,
       required: true,
     },
-    brand: {
-      type: String,
+    discount: {
+      type: Number,
       required: true,
     },
   },
@@ -55,4 +43,7 @@ const productSchema = new Schema(
   }
 );
 
-export const Product = model<IProduct, ProductModel>('Product', productSchema);
+export const OfferProduct = model<IProduct, OfferProductModel>(
+  'OfferProduct',
+  productSchema
+);
