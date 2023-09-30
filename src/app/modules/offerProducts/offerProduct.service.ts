@@ -37,7 +37,7 @@ const getAllOfferProducts = async (filters: IProductFilters) => {
 
   const whereConditions =
     andConditions.length > 0 ? { $and: andConditions } : {};
-  const result = await Product.find(whereConditions);
+  const result = await OfferProduct.find(whereConditions);
 
   return {
     data: result,

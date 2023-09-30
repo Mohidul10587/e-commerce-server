@@ -11,7 +11,7 @@ router.post(
   OfferProductController.createOfferProduct
 );
 
-// router.get('/', ProductController.getAllProducts);
+router.get('/', OfferProductController.getAllOfferProducts);
 // // router.delete('/delete-product/:id', ProductController.deleteProduct);
 
 // router.get(
