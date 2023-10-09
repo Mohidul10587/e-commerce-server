@@ -4,22 +4,23 @@ import { Request, RequestHandler, Response } from 'express';
 import httpStatus from 'http-status';
 import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
-import { AdminService } from './admin.services';
+
 import config from '../../../config';
 import ApiError from '../../../errors/ApiError';
 import { jwtHelpers } from '../../../helpers/jwtHelpers';
 import { JwtPayload } from 'jsonwebtoken';
+import { SellerService } from './seller.services';
 
-const createAdmin: RequestHandler = catchAsync(async (req, res) => {
+const createSeller: RequestHandler = catchAsync(async (req, res) => {
   const data = req.body;
 
-  const result = await AdminService.createAdmin(data);
-  const { refreshToken, accessToken, adminData } = result;
-  const name = adminData.name;
+  const result = await SellerService.createSeller(data);
+  const { refreshToken, accessToken, sellerData } = result;
+  const name = sellerData.name;
 
-  const role = adminData.role;
-  const email = adminData.email;
-  const _id = adminData._id;
+  const role = sellerData.role;
+  const email = sellerData.email;
+  const _id = sellerData._id;
   const finalResult = {
     name,
     role,
@@ -37,13 +38,13 @@ const createAdmin: RequestHandler = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
-    message: 'Admin account created Successfully!',
+    message: 'Seller account created Successfully!',
     data: finalResult,
   });
 });
 
-const loginAdmin = catchAsync(async (req: Request, res: Response) => {
-  const result = await AdminService.loginAdmin(req.body);
+const loginSeller = catchAsync(async (req: Request, res: Response) => {
+  const result = await SellerService.loginSeller(req.body);
 
   const { refreshToken, ...others } = result;
 
@@ -57,12 +58,12 @@ const loginAdmin = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Admin logged in successfully!',
+    message: 'Seller logged in successfully!',
     data: others,
   });
 });
 
-const checkAdmin = catchAsync(async (req: Request, res: Response) => {
+const checkSeller = catchAsync(async (req: Request, res: Response) => {
   const token = req.headers.authorization;
   if (!token) {
     throw new ApiError(httpStatus.UNAUTHORIZED, 'You are not authorized!');
@@ -74,9 +75,9 @@ const checkAdmin = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Admin logged in successfully!',
-    data: { role, userId },
+    message: 'Seller logged in successfully!',
+    data: { role },
   });
 });
 
-export const AdminController = { createAdmin, loginAdmin, checkAdmin };
+export const SellerController = { createSeller, loginSeller, checkSeller };

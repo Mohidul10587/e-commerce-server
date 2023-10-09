@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { adminRole } from './admin.constant';
+import { sellerRole } from './seller.constant';
 
-const createAdminZodSchema = z.object({
+const createSellerZodSchema = z.object({
   body: z.object({
     name: z.string({ required_error: 'Name is required!' }),
     email: z.string({ required_error: 'Phone number is required!' }),
-    role: z.enum([...adminRole] as [string, ...string[]]).optional(),
+    role: z.enum([...sellerRole] as [string, ...string[]]).optional(),
     password: z.string({ required_error: 'Password is required!' }),
   }),
 });
@@ -17,7 +17,7 @@ const loginZodSchema = z.object({
   }),
 });
 
-export const AdminValidation = {
-  createAdminZodSchema,
+export const SellerValidation = {
+  createSellerZodSchema,
   loginZodSchema,
 };

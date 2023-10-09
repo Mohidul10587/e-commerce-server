@@ -2,24 +2,24 @@
 /* eslint-disable no-unused-vars */
 import { Model } from 'mongoose';
 
-export type IAdminLoginResponse = {
+export type ISellerLoginResponse = {
   accessToken: string;
   refreshToken?: string;
 };
 
-export type IAdmin = {
+export type ISeller = {
   _id: string;
   name: string;
   email: string;
-  role: 'admin';
+  role: 'seller';
   password: string;
 };
 
-export interface AdminModel extends Model<IAdmin> {
-  isAdminExist(email: string): Pick<IAdmin, '_id' | 'password' | 'role'>;
+export interface SellerModel extends Model<ISeller> {
+  isSellerExist(email: string): Pick<ISeller, '_id' | 'password' | 'role'>;
   isPasswordMatched(givenPass: string, savedPass: string): boolean;
 }
-export type ILoginAdmin = {
+export type ILoginSeller = {
   email: string;
   password: string;
 };

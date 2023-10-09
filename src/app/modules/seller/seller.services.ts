@@ -1,15 +1,20 @@
 import { Secret } from 'jsonwebtoken';
-import { IAdmin, IAdminLoginResponse, ILoginAdmin } from './admin.interface';
-import Admin from './admin.model';
+
 import { jwtHelpers } from '../../../helpers/jwtHelpers';
 import config from '../../../config';
 import ApiError from '../../../errors/ApiError';
 import httpStatus from 'http-status';
+import {
+  ILoginSeller,
+  ISeller,
+  ISellerLoginResponse,
+} from './seller.interface';
+import Seller from './seller.model';
 
-const createAdmin = async (payload: IAdmin) => {
-  const adminData = await Admin.create(payload);
+const createSeller = async (payload: ISeller) => {
+  const sellerData = await Seller.create(payload);
   // create access and refresh token
-  const { _id, role } = adminData;
+  const { _id, role } = sellerData;
 
   const accessToken = jwtHelpers.createToken(
     {
@@ -30,31 +35,31 @@ const createAdmin = async (payload: IAdmin) => {
   );
 
   return {
-    adminData,
+    sellerData,
     accessToken,
     refreshToken,
   };
 };
 
-const loginAdmin = async (
-  payload: ILoginAdmin
-): Promise<IAdminLoginResponse> => {
-  const adminData = await Admin.isAdminExist(payload.email);
-  // Check admin
-  if (!adminData) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'No admin found!');
+const loginSeller = async (
+  payload: ILoginSeller
+): Promise<ISellerLoginResponse> => {
+  const sellerData = await Seller.isSellerExist(payload.email);
+  // Check seller
+  if (!sellerData) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No seller found!');
   }
 
   // Check password
   const isMatchedPassword =
-    adminData?.password &&
-    (await Admin.isPasswordMatched(payload.password, adminData.password));
+    sellerData?.password &&
+    (await Seller.isPasswordMatched(payload.password, sellerData.password));
   if (!isMatchedPassword) {
     throw new ApiError(httpStatus.BAD_REQUEST, "Password doesn't match !");
   }
 
   // create access and refresh token
-  const { _id, role } = adminData;
+  const { _id, role } = sellerData;
 
   const accessToken = jwtHelpers.createToken(
     {
@@ -80,4 +85,4 @@ const loginAdmin = async (
   };
 };
 
-export const AdminService = { createAdmin, loginAdmin };
+export const SellerService = { createSeller, loginSeller };
