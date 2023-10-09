@@ -4,28 +4,29 @@ import { Request, RequestHandler, Response } from 'express';
 import httpStatus from 'http-status';
 import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
-
+import { SellerService } from './seller.services';
 import config from '../../../config';
 import ApiError from '../../../errors/ApiError';
 import { jwtHelpers } from '../../../helpers/jwtHelpers';
 import { JwtPayload } from 'jsonwebtoken';
-import { SellerService } from './seller.services';
 
 const createSeller: RequestHandler = catchAsync(async (req, res) => {
   const data = req.body;
 
   const result = await SellerService.createSeller(data);
-  const { refreshToken, accessToken, sellerData } = result;
-  const name = sellerData.name;
 
+  const { refreshToken, accessToken, sellerData } = result;
+
+  const name = sellerData.name;
   const role = sellerData.role;
-  const email = sellerData.email;
   const _id = sellerData._id;
+  const email = sellerData.email;
+
   const finalResult = {
-    name,
     role,
-    email,
+    name,
     _id,
+    email,
     accessToken,
   };
   // refresh token set into cookies
@@ -70,13 +71,13 @@ const checkSeller = catchAsync(async (req: Request, res: Response) => {
   }
   // Verify token
   const verifyUser = jwtHelpers.verifyToken(token, config.jwt.secret as string);
-  const { userId, role } = verifyUser as JwtPayload;
-  console.log(userId, role);
+  const { userId, role, name, email } = verifyUser as JwtPayload;
+  console.log(verifyUser);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Seller logged in successfully!',
-    data: { role },
+    data: { role, userId, name, email },
   });
 });
 

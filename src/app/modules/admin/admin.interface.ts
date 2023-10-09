@@ -16,7 +16,9 @@ export type IAdmin = {
 };
 
 export interface AdminModel extends Model<IAdmin> {
-  isAdminExist(email: string): Pick<IAdmin, '_id' | 'password' | 'role'>;
+  isAdminExist(
+    email: string
+  ): Pick<IAdmin, '_id' | 'password' | 'role' | 'email' | 'name'>;
   isPasswordMatched(givenPass: string, savedPass: string): boolean;
 }
 export type ILoginAdmin = {

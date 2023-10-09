@@ -9,12 +9,14 @@ import httpStatus from 'http-status';
 const createAdmin = async (payload: IAdmin) => {
   const adminData = await Admin.create(payload);
   // create access and refresh token
-  const { _id, role } = adminData;
+  const { _id, role, name, email } = adminData;
 
   const accessToken = jwtHelpers.createToken(
     {
       userId: _id,
       role: role,
+      name,
+      email,
     },
     config.jwt.secret as Secret,
     config.jwt.expires_in as string
@@ -24,6 +26,8 @@ const createAdmin = async (payload: IAdmin) => {
     {
       userId: _id,
       role: role,
+      name,
+      email,
     },
     config.jwt.refresh_secret as Secret,
     config.jwt.refresh_expires_in as string
@@ -54,12 +58,14 @@ const loginAdmin = async (
   }
 
   // create access and refresh token
-  const { _id, role } = adminData;
+  const { _id, role, name, email } = adminData;
 
   const accessToken = jwtHelpers.createToken(
     {
       userId: _id,
       role: role,
+      name,
+      email,
     },
     config.jwt.secret as Secret,
     config.jwt.expires_in as string
@@ -69,6 +75,8 @@ const loginAdmin = async (
     {
       userId: _id,
       role: role,
+      name,
+      email,
     },
     config.jwt.refresh_secret as Secret,
     config.jwt.refresh_expires_in as string

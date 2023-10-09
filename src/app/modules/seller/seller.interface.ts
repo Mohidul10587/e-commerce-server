@@ -16,7 +16,9 @@ export type ISeller = {
 };
 
 export interface SellerModel extends Model<ISeller> {
-  isSellerExist(email: string): Pick<ISeller, '_id' | 'password' | 'role'>;
+  isSellerExist(
+    email: string
+  ): Pick<ISeller, '_id' | 'password' | 'role' | 'email' | 'name'>;
   isPasswordMatched(givenPass: string, savedPass: string): boolean;
 }
 export type ILoginSeller = {

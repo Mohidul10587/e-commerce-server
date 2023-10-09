@@ -14,17 +14,19 @@ const createAdmin: RequestHandler = catchAsync(async (req, res) => {
   const data = req.body;
 
   const result = await AdminService.createAdmin(data);
-  const { refreshToken, accessToken, adminData } = result;
-  const name = adminData.name;
 
+  const { refreshToken, accessToken, adminData } = result;
+
+  const name = adminData.name;
   const role = adminData.role;
-  const email = adminData.email;
   const _id = adminData._id;
+  const email = adminData.email;
+
   const finalResult = {
-    name,
     role,
-    email,
+    name,
     _id,
+    email,
     accessToken,
   };
   // refresh token set into cookies
@@ -69,13 +71,13 @@ const checkAdmin = catchAsync(async (req: Request, res: Response) => {
   }
   // Verify token
   const verifyUser = jwtHelpers.verifyToken(token, config.jwt.secret as string);
-  const { userId, role } = verifyUser as JwtPayload;
-  console.log(userId, role);
+  const { userId, role, name, email } = verifyUser as JwtPayload;
+  console.log(verifyUser);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Admin logged in successfully!',
-    data: { role, userId },
+    data: { role, userId, name, email },
   });
 });
 

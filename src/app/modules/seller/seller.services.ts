@@ -1,25 +1,26 @@
 import { Secret } from 'jsonwebtoken';
-
+import {
+  ISeller,
+  ISellerLoginResponse,
+  ILoginSeller,
+} from './seller.interface';
+import Seller from './seller.model';
 import { jwtHelpers } from '../../../helpers/jwtHelpers';
 import config from '../../../config';
 import ApiError from '../../../errors/ApiError';
 import httpStatus from 'http-status';
-import {
-  ILoginSeller,
-  ISeller,
-  ISellerLoginResponse,
-} from './seller.interface';
-import Seller from './seller.model';
 
 const createSeller = async (payload: ISeller) => {
   const sellerData = await Seller.create(payload);
   // create access and refresh token
-  const { _id, role } = sellerData;
+  const { _id, role, name, email } = sellerData;
 
   const accessToken = jwtHelpers.createToken(
     {
       userId: _id,
       role: role,
+      name,
+      email,
     },
     config.jwt.secret as Secret,
     config.jwt.expires_in as string
@@ -29,6 +30,8 @@ const createSeller = async (payload: ISeller) => {
     {
       userId: _id,
       role: role,
+      name,
+      email,
     },
     config.jwt.refresh_secret as Secret,
     config.jwt.refresh_expires_in as string
@@ -59,12 +62,14 @@ const loginSeller = async (
   }
 
   // create access and refresh token
-  const { _id, role } = sellerData;
+  const { _id, role, name, email } = sellerData;
 
   const accessToken = jwtHelpers.createToken(
     {
       userId: _id,
       role: role,
+      name,
+      email,
     },
     config.jwt.secret as Secret,
     config.jwt.expires_in as string
@@ -74,6 +79,8 @@ const loginSeller = async (
     {
       userId: _id,
       role: role,
+      name,
+      email,
     },
     config.jwt.refresh_secret as Secret,
     config.jwt.refresh_expires_in as string
