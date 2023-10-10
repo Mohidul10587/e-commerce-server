@@ -72,7 +72,7 @@ const checkSeller = catchAsync(async (req: Request, res: Response) => {
   // Verify token
   const verifyUser = jwtHelpers.verifyToken(token, config.jwt.secret as string);
   const { userId, role, name, email } = verifyUser as JwtPayload;
-  console.log(verifyUser);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

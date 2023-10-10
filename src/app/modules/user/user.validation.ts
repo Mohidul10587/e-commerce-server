@@ -1,65 +1,23 @@
 import { z } from 'zod';
-import { role } from './user.interface';
+import { userRole } from './user.constant';
 
 const createUserZodSchema = z.object({
   body: z.object({
-    password: z.string({
-      required_error: 'Password is required',
-    }),
-    role: z.enum([...role] as [string, ...string[]]),
-    name: z.string({
-      required_error: 'LastName is required',
-    }),
-    email: z.string({
-      required_error: 'LastName is required',
-    }),
+    name: z.string({ required_error: 'Name is required!' }),
+    email: z.string({ required_error: 'Phone number is required!' }),
+    role: z.enum([...userRole] as [string, ...string[]]).optional(),
+    password: z.string({ required_error: 'Password is required!' }),
   }),
 });
-const updateUserZodSchema = z.object({
+
+const loginZodSchema = z.object({
   body: z.object({
-    password: z
-      .string({
-        required_error: 'Password is required',
-      })
-      .optional(),
-    role: z.enum([...role] as [string, ...string[]]).optional(),
-    name: z
-      .object({
-        firstName: z
-          .string({
-            required_error: 'FirstName is required',
-          })
-          .optional(),
-        lastName: z
-          .string({
-            required_error: 'LastName is required',
-          })
-          .optional(),
-      })
-      .optional(),
-    phoneNumber: z
-      .string({
-        required_error: 'PhoneNumber is required',
-      })
-      .optional(),
-    address: z
-      .string({
-        required_error: 'Address  is required',
-      })
-      .optional(),
-    budget: z
-      .number({
-        required_error: 'Budget  is required',
-      })
-      .optional(),
-    income: z
-      .number({
-        required_error: 'Income  is required',
-      })
-      .optional(),
+    email: z.string({ required_error: 'Phone is required!' }),
+    password: z.string({ required_error: 'Password is required!' }),
   }),
 });
+
 export const UserValidation = {
   createUserZodSchema,
-  updateUserZodSchema,
+  loginZodSchema,
 };

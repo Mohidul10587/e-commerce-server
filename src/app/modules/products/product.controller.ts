@@ -94,6 +94,24 @@ const getAllProducts: RequestHandler = catchAsync(
   }
 );
 
+const getSingleSellersProducts: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const sellerEmail = req.params.email;
+    console.log('first', sellerEmail);
+    const filters = pick(req.query, productFilterableFields);
+    const results = await ProductService.getSingleSellersProducts(
+      filters,
+      sellerEmail
+    );
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Successfully retrieve Productsxx',
+      data: results,
+    });
+  }
+);
+
 const getSingleCategoryProduct: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
     const categoryName = req.params.categoryName;
@@ -140,6 +158,18 @@ const getSingleProduct: RequestHandler = catchAsync(
     });
   }
 );
+const getSingleOfferProduct: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const id = req.params.id;
+    const result = await ProductService.getSingleOfferProduct(id);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: `Successfully retrieve Products of ${id}`,
+      data: result,
+    });
+  }
+);
 const updateProduct: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
     const updatedProduct = req.body;
@@ -172,7 +202,9 @@ const deleteSingleProduct: RequestHandler = catchAsync(
 export const ProductController = {
   createProduct,
   getAllProducts,
+  getSingleSellersProducts,
   getSingleProduct,
+  getSingleOfferProduct,
   getSingleCategoryProduct,
   deleteSingleProduct,
   getSingleSubCategoryProduct,

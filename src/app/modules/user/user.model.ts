@@ -1,60 +1,37 @@
 /* eslint-disable @typescript-eslint/no-this-alias */
-import { Schema, model } from 'mongoose';
-import { IUser, UserModel } from './user.interface';
 import bcrypt from 'bcrypt';
+import { Schema, model } from 'mongoose';
 import config from '../../../config';
+import { userRole } from './user.constant';
+import { UserModel, IUser } from './user.interface';
 
-const userSchema = new Schema(
-  {
-    password: {
-      type: String,
-      required: true,
-    },
-    role: {
-      type: String,
-      required: true,
-    },
-    email: {
-      type: String,
-      required: true,
-    },
-    name: {
-      type: String,
-      required: true,
-    },
-  },
-  {
-    timestamps: true,
-    toJSON: {
-      virtuals: true,
-    },
-  }
-);
-
-// Check user exit's
-userSchema.methods.isUserExit = async function (
-  email: string
-): Promise<Partial<IUser> | null> {
-  return await User.findOne({ email }, { role: 1, password: 1 });
-};
-
-// check or compare password
-userSchema.methods.isPasswordMatched = async function (
-  textPassword: string,
-  hashPassword: string
-): Promise<boolean> {
-  return await bcrypt.compare(textPassword, hashPassword);
-};
-
-// Hash password using prehook middleware
-userSchema.pre('save', async function (next) {
-  const user = this;
-  user.password = await bcrypt.hash(
-    this.password,
-    Number(config.bycrypt_salt_rounds)
-  );
-
-  next();
+const userSchema = new Schema<IUser>({
+  name: { type: String, required: true, trim: true },
+  password: { type: String, required: true /* select: 0*/ },
+  role: { type: String, enum: userRole, default: 'user' },
+  email: { type: String, unique: true, required: true, trim: true },
 });
 
-export const User = model<IUser, UserModel>('User', userSchema);
+// Make the Hash Password
+userSchema.pre('save', async function () {
+  const user = this;
+  user.password = await bcrypt.hash(
+    user.password,
+    Number(config.bycrypt_salt_rounds)
+  );
+});
+
+// Check the user exist or not
+userSchema.statics.isUserExist = async function (email) {
+  const userExist = await User.findOne({ email });
+  return userExist;
+};
+
+// Check  Password of user
+userSchema.statics.isPasswordMatched = async function (givenPass, savedPass) {
+  const passMatched = await bcrypt.compare(givenPass, savedPass);
+  return passMatched;
+};
+
+const User = model<IUser, UserModel>('User', userSchema);
+export default User;

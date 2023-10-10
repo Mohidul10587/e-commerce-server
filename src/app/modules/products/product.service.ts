@@ -3,6 +3,7 @@ import ApiError from '../../../errors/ApiError';
 import { IProduct, IProductFilters } from './product.interface';
 import { Product } from './product.model';
 import { productSearchableFields } from './product.constant';
+import { OfferProduct } from '../offerProducts/offerProduct.model';
 
 const createProduct = async (payloads: IProduct) => {
   console.log('this is payload ', payloads);
@@ -42,6 +43,43 @@ const getAllProducts = async (filters: IProductFilters) => {
   };
 };
 
+const getSingleSellersProducts = async (
+  filters: IProductFilters,
+  sellerEmail: string
+) => {
+  console.log(sellerEmail);
+  const { searchTerm, ...filtersData } = filters;
+  const andConditions = [];
+
+  if (searchTerm) {
+    andConditions.push({
+      $or: productSearchableFields.map(field => ({
+        [field]: {
+          $regex: searchTerm,
+          $options: 'i',
+        },
+      })),
+    });
+  }
+
+  if (Object.keys(filtersData).length) {
+    andConditions.push({
+      $and: Object.entries(filtersData).map(([field, value]) => ({
+        [field]: value,
+      })),
+    });
+  }
+  andConditions.push({
+    sellerEmail: sellerEmail,
+  });
+  const whereConditions =
+    andConditions.length > 0 ? { $and: andConditions } : {};
+  const result = await Product.find(whereConditions);
+
+  return {
+    data: result,
+  };
+};
 const getSingleCategoryProduct = async (
   categoryName: string,
   filters: IProductFilters
@@ -174,6 +212,11 @@ const getSingleProduct = async (id: string) => {
 
   return result;
 };
+const getSingleOfferProduct = async (id: string) => {
+  const result = await OfferProduct.findOne({ _id: Object(id) });
+
+  return result;
+};
 const deleteSingleProduct = async (id: string) => {
   const isExist = await Product.findOne({ _id: Object(id) });
 
@@ -211,7 +254,9 @@ const updateProduct = async (payload: Partial<IProduct>, id: string) => {
 export const ProductService = {
   createProduct,
   getAllProducts,
+  getSingleSellersProducts,
   deleteSingleProduct,
+  getSingleOfferProduct,
   getSingleProduct,
   getSingleCategoryProduct,
   getSingleSubCategoryProduct,

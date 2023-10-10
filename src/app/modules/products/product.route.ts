@@ -13,11 +13,21 @@ router.post(
 
 router.get('/', ProductController.getAllProducts);
 // router.delete('/delete-product/:id', ProductController.deleteProduct);
+router.get(
+  '/singleSellersProduct/:email',
+  ProductController.getSingleSellersProducts
+);
+// router.delete('/delete-product/:id', ProductController.deleteProduct);
 
 router.get(
   '/single-product/:id',
   // auth(ENUM_USER_ROLE.BUYER),
   ProductController.getSingleProduct
+);
+router.get(
+  '/single-offer-product/:id',
+  // auth(ENUM_USER_ROLE.BUYER),
+  ProductController.getSingleOfferProduct
 );
 router.get(
   '/category/:categoryName',

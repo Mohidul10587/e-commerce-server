@@ -1,22 +1,27 @@
+/* eslint-disable @typescript-eslint/consistent-type-definitions */
 /* eslint-disable no-unused-vars */
 import { Model } from 'mongoose';
 
+export type IUserLoginResponse = {
+  accessToken: string;
+  refreshToken?: string;
+};
+
 export type IUser = {
-  _id?: string;
-  password: string;
-  role: string;
+  _id: string;
   name: string;
   email: string;
+  role: 'user';
+  password: string;
 };
 
-export type IUserMethods = {
-  isUserExit(phoneNumber: string): Promise<Partial<IUser> | null>;
-  isPasswordMatched(
-    textPassword: string,
-    hashPassword: string
-  ): Promise<boolean>;
+export interface UserModel extends Model<IUser> {
+  isUserExist(
+    email: string
+  ): Pick<IUser, '_id' | 'password' | 'role' | 'email' | 'name'>;
+  isPasswordMatched(givenPass: string, savedPass: string): boolean;
+}
+export type ILoginUser = {
+  email: string;
+  password: string;
 };
-
-export type UserModel = Model<IUser, Record<string, unknown>, IUserMethods>;
-
-export const role = ['seller', 'buyer'];

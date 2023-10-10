@@ -7,10 +7,7 @@ const productSchema = new Schema(
       type: String,
       required: true,
     },
-    unit: {
-      type: String,
-      required: true,
-    },
+
     category: {
       type: String,
       required: true,
@@ -43,6 +40,10 @@ const productSchema = new Schema(
       required: true,
     },
     brand: {
+      type: String,
+      required: true,
+    },
+    sellerEmail: {
       type: String,
       required: true,
     },
