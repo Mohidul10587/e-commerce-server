@@ -33,8 +33,8 @@ const getAllCartProducts: RequestHandler = catchAsync(
     // const filters = pick(req.query, productFilterableFields);
 
     // const paginationOptions = pick(req.query, paginationFields);
-    const userId = req.params.userId;
-    const results = await CartService.getAllCartProducts(userId);
+    const buyerEmail = req.params.buyerEmail;
+    const results = await CartService.getAllCartProducts(buyerEmail);
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,

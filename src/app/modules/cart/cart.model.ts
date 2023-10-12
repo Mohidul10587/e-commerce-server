@@ -7,7 +7,7 @@ const cartProductSchema = new Schema(
       type: Object,
       required: true,
     },
-    buyer: {
+    buyerEmail: {
       type: String,
       required: true,
     },

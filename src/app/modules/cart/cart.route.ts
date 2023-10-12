@@ -12,7 +12,7 @@ router.post(
   CartController.addProduct
 );
 
-router.get('/:userId', CartController.getAllCartProducts);
+router.get('/:buyerEmail', CartController.getAllCartProducts);
 
 router.delete(
   '/:id',

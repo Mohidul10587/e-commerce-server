@@ -11,8 +11,8 @@ const addProduct = async (payload: ICartProduct) => {
   return result;
 };
 
-const getAllCartProducts = async (userId: string) => {
-  const result = await CartProduct.find({ buyer: Object(userId) });
+const getAllCartProducts = async (buyerEmail: string) => {
+  const result = await CartProduct.find({ buyerEmail: buyerEmail });
   return result;
 };
 

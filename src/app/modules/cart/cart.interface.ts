@@ -7,7 +7,7 @@ export const category = ['Dairy', 'Beef', 'Dual Purpose'];
 
 export type ICartProduct = {
   product: Types.ObjectId | IProduct;
-  buyer: Types.ObjectId | IUser;
+  buyerEmail: string;
 };
 
 export type IProductFilters = {
