@@ -18,4 +18,14 @@ router.get(
   // validateRequest(UserValidation.loginZodSchema),
   UserController.checkUser
 );
+router.get(
+  '/',
+  // validateRequest(UserValidation.loginZodSchema),
+  UserController.getAllUsers
+);
+router.delete(
+  '/deleteUser/:id',
+  // validateRequest(UserValidation.loginZodSchema),
+  UserController.deleteUser
+);
 export const UserRoutes = router;

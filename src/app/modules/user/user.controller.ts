@@ -81,4 +81,34 @@ const checkUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-export const UserController = { createUser, loginUser, checkUser };
+const getAllUsers: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const results = await UserService.getAllUsers();
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Successfully retrieve Users',
+      data: results,
+    });
+  }
+);
+const deleteUser: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const id = req.params.id;
+    const deletedUser = await UserService.deleteUser(id);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Successfully deleted the user',
+      data: deletedUser,
+    });
+  }
+);
+
+export const UserController = {
+  createUser,
+  loginUser,
+  checkUser,
+  getAllUsers,
+  deleteUser,
+};

@@ -86,4 +86,15 @@ const loginUser = async (payload: ILoginUser): Promise<IUserLoginResponse> => {
   };
 };
 
-export const UserService = { createUser, loginUser };
+const getAllUsers = async () => {
+  const result = await User.find();
+  return result;
+};
+
+const deleteUser = async (id: string) => {
+  const result = await User.deleteOne({ _id: Object(id) });
+
+  return result;
+};
+
+export const UserService = { createUser, loginUser, getAllUsers, deleteUser };
