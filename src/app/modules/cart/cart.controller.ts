@@ -65,9 +65,11 @@ const deleteCartProduct: RequestHandler = catchAsync(
 
 const paymentIntent: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
+    const totalPrice = req.body.totalPrice;
+    console.log(totalPrice);
     const paymentIntent = await stripeInstance.paymentIntents.create({
       currency: 'usd',
-      amount: 10005500,
+      amount: 500000,
       payment_method_types: ['card'],
     });
     res.send({
