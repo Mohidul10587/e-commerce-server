@@ -14,7 +14,7 @@ const createProduct = async (payloads: IProduct) => {
 const getAllProducts = async (filters: IProductFilters) => {
   const { searchTerm, ...filtersData } = filters;
   const andConditions = [];
-
+  console.log(searchTerm);
   if (searchTerm) {
     andConditions.push({
       $or: productSearchableFields.map(field => ({

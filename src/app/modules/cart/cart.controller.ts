@@ -5,8 +5,14 @@ import catchAsync from '../../../shared/catchAsync';
 // import pick from '../../../shared/pick';
 import sendResponse from '../../../shared/sendResponse';
 // import { productFilterableFields } from './product.constant';
+import stripe from 'stripe';
 import { ICartProduct } from './cart.interface';
 import { CartService } from './cart.service';
+
+const secretKey =
+  'sk_test_51MSFzbGk3QfbJiMcsqL1UPl95CGQ4zuA9vzlgYy8aodGEOs7jobqIhTQfdnH50XILCQVSJhL5kSDosjGgjT3ZV2v00SYnQOh85';
+
+const stripeInstance = new stripe(secretKey);
 
 const addProduct: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
@@ -57,8 +63,22 @@ const deleteCartProduct: RequestHandler = catchAsync(
   }
 );
 
+const paymentIntent: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const paymentIntent = await stripeInstance.paymentIntents.create({
+      currency: 'usd',
+      amount: 10005500,
+      payment_method_types: ['card'],
+    });
+    res.send({
+      clientSecret: paymentIntent.client_secret,
+    });
+  }
+);
+
 export const CartController = {
   addProduct,
   getAllCartProducts,
   deleteCartProduct,
+  paymentIntent,
 };
