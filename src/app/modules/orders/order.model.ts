@@ -3,33 +3,18 @@ import { IOrder, OrderModel } from './order.interface';
 
 const OrderSchema = new Schema(
   {
-    currentUser: {
-      type: String,
-      required: true,
+    shippingAddress: {
+      name: String,
+      address: String,
+      city: String,
+      postalCode: String,
     },
-    bkashNo: {
-      type: String,
-      required: true,
-    },
-    transactionId: {
-      type: String,
-      required: true,
-    },
-    amount: {
-      type: Number,
-      required: true,
-    },
-    deliveryAddress: {
-      type: String,
-      required: true,
-    },
-    phoneNo: {
-      type: Number,
-      required: true,
-    },
-    cartProducts: {
-      type: Schema.Types.Mixed,
-      required: true,
+    orderSummary: {
+      items: Number,
+      subtotal: Number,
+      shippingCharge: Number,
+      vat: Number,
+      total: Number,
     },
   },
   {
