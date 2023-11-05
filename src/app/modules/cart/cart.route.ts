@@ -13,7 +13,11 @@ router.post(
 );
 
 router.get('/:buyerEmail', CartController.getAllCartProducts);
-
+router.delete(
+  '/deleteByEmail',
+  // validateRequest(CartController.updateProductZodSchema),
+  CartController.deleteMultipleCartProduct
+);
 router.delete(
   '/:id',
   // validateRequest(CartController.updateProductZodSchema),

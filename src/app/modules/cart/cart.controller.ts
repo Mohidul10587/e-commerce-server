@@ -62,6 +62,18 @@ const deleteCartProduct: RequestHandler = catchAsync(
     });
   }
 );
+const deleteMultipleCartProduct: RequestHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const email = req.body.email;
+    const deletedOrder = await CartService.deleteMultipleCartProduct(email);
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Successfully deleted the order',
+      data: deletedOrder,
+    });
+  }
+);
 
 const paymentIntent: RequestHandler = catchAsync(
   async (req: Request, res: Response) => {
@@ -83,4 +95,5 @@ export const CartController = {
   getAllCartProducts,
   deleteCartProduct,
   paymentIntent,
+  deleteMultipleCartProduct,
 };

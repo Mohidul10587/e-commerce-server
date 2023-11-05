@@ -1,8 +1,5 @@
-import { startSession } from 'mongoose';
 import { ICartProduct } from './cart.interface';
 import { CartProduct } from './cart.model';
-import ApiError from '../../../errors/ApiError';
-import httpStatus from 'http-status';
 
 const addProduct = async (payload: ICartProduct) => {
   // create order
@@ -21,11 +18,17 @@ const deleteCartProduct = async (id: string) => {
 
   return result;
 };
+const deleteMultipleCartProduct = async (email: string) => {
+  const result = await CartProduct.deleteMany({ buyerEmail: email });
+
+  return result;
+};
 
 export const CartService = {
   addProduct,
   getAllCartProducts,
   deleteCartProduct,
+  deleteMultipleCartProduct,
   // getSingleProduct,
   // updateProduct,
 };
