@@ -16,7 +16,12 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://seal-client.vercel.app"],
+    origin: [
+      "http://localhost:3000",
+      "https://seal-client.vercel.app",
+      "https://nextcareit.com",
+      "https://www.nextcareit.com",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
   })
