@@ -1,0 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const controller_1 = require("./controller");
+const auth_1 = require("../../middleware/auth");
+const router = (0, express_1.Router)();
+router.get("/list", auth_1.verifySuperAdmin, controller_1.getUsersAll);
+router.get("/filter", auth_1.verifySuperAdmin, controller_1.filterUsers);
+router.get("/by-role", auth_1.verifySuperAdmin, controller_1.getUsersByRole);
+router.get("/teachers", auth_1.verifySuperAdmin, controller_1.getTeachers);
+router.get("/getUserByIdForAdmin/:id", auth_1.verifySuperAdmin, controller_1.getUserByIdForAdmin);
+router.put("/update-role", auth_1.verifySuperAdmin, controller_1.updateUserRole);
+router.put("/updateUserByIdByAdmin/:id", auth_1.verifySuperAdmin, controller_1.updateUserByIdByAdmin);
+router.patch("/toggleUserStatus/:id", auth_1.verifySuperAdmin, controller_1.toggleUserStatus);
+router.put("/updatePasswordByAdmin/:id", auth_1.verifySuperAdmin, controller_1.updatePasswordByAdmin);
+router.put("/updateSalary/:id", auth_1.verifySuperAdmin, controller_1.updateUserByIdByAdmin);
+router.delete("/deleteUserByIdByAdmin/:id", auth_1.verifySuperAdmin, controller_1.deleteUserByIdByAdmin);
+exports.default = router;

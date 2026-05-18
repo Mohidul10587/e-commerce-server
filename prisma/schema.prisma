@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  designer
+  auditor
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String   @unique
+  password  String
+  role      Role     @default(designer)
+  isActive  Boolean  @default(false)
+  image     String?
+  createdAt DateTime @default(now())
+}
+
+model GeneralSettings {
+  id              Int      @id @default(autoincrement())
+  siteTitle       String?
+  siteDescription String?
+  logo            String?
+  favicon         String?
+  email           String?
+  phone           String?
+  address         String?
+  supportEmail    String?
+  facebook        String?
+  instagram       String?
+  twitter         String?
+  linkedin        String?
+  youtube         String?
+  tiktok          String?
+  whatsapp        String?
+  telegram        String?
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String[]
+  metaImage       String?
+  footerText      String?
+  banners         Banner[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Banner {
+  id           Int             @id @default(autoincrement())
+  desktopImage String
+  mobileImage  String
+  link         String?
+  order        Int             @default(0)
+  settingsId   Int
+  settings     GeneralSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+}
