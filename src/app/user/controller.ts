@@ -131,7 +131,7 @@ export async function createUser(req: Request, res: Response) {
 
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { name, phone, password: hashed, role: role || "designer" },
+      data: { name, phone, password: hashed, role: role || "customer" },
     });
     return res.status(201).json({ message: "User created", user: safeUser(user) });
   } catch (error) {

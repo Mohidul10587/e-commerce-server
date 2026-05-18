@@ -6,6 +6,8 @@ import cookieParser from "cookie-parser";
 import { errorHandler } from "./middleware/errorHandler";
 import { userRoutes } from "./app/user/routes";
 import { settingsRoutes } from "./app/settings/routes";
+import { categoryRoutes } from "./app/category/category.routes";
+import { productRoutes } from "./app/product/product.routes";
 
 dotenv.config();
 const app: Express = express();
@@ -33,6 +35,8 @@ app.get("/", (_req: Request, res: Response) =>
 
 app.use("/user", userRoutes);
 app.use("/settings", settingsRoutes);
+app.use("/categories", categoryRoutes);
+app.use("/products", productRoutes);
 
 app.use(errorHandler);
 

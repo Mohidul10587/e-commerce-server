@@ -12,7 +12,13 @@ export const errorHandler = (
     return res.status(400).json({ message: JSON.parse(firstError) });
   }
 
-  res.status(err.status || 500).json({
+  if (err?.code === "P1001" || err?.code === "P1002") {
+    return res
+      .status(503)
+      .json({ message: "Database unavailable, please retry" });
+  }
+
+  return res.status(500).json({
     message: err.message || {
       en: "Internal server error",
       bn: "অভ্যন্তরীণ সার্ভার ত্রুটি",
