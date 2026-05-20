@@ -77,17 +77,6 @@ model Banner {
   settings     GeneralSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
 }
 
-model Category {
-  id        Int       @id @default(autoincrement())
-  name      String
-  slug      String    @unique
-  image     String?
-  isActive  Boolean   @default(true)
-  products  Product[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-}
-
 model Product {
   id             Int              @id @default(autoincrement())
   title          String
@@ -97,8 +86,6 @@ model Product {
   seoDescription String?
   keywords       String[]
   type           ProductType
-  categoryId     Int
-  category       Category         @relation(fields: [categoryId], references: [id])
   totalStock     Int              @default(0)
   isActive       Boolean          @default(true)
   variants       ProductVariant[]
@@ -134,4 +121,41 @@ model StockHistory {
   quantity  Int
   note      String?
   createdAt DateTime    @default(now())
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  processing
+  shipped
+  delivered
+  cancelled
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  customerName    String
+  customerPhone   String
+  address         String
+  city            String
+  postalCode      String
+  country         String
+  items           OrderItem[]
+  subtotal        Float
+  deliveryCharge  Float
+  total           Float
+  status          OrderStatus @default(pending)
+  note            String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  id          Int    @id @default(autoincrement())
+  orderId     Int
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId   Int
+  title       String
+  price       Float
+  quantity    Int
 }

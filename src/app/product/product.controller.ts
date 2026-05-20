@@ -4,24 +4,18 @@ import { createProductSchema, updateProductSchema } from "./product.validation";
 import { syncVariants, syncProductStock, adjustStock } from "./product.service";
 import { StockAction } from "@prisma/client";
 
-// ── Helpers ───────────────────────────────────────────────────────
-
 const productInclude = {
-  category: { select: { id: true, name: true, slug: true } },
   variants: {
     where: { isActive: true },
     orderBy: { isDefault: "desc" as const },
   },
 };
 
-// ── List / Detail ─────────────────────────────────────────────────
-
 export async function getProducts(req: Request, res: Response) {
   try {
-    const { categoryId, type, isActive, page = "1", limit = "20" } = req.query;
+    const { type, isActive, page = "1", limit = "20" } = req.query;
 
     const where: any = {};
-    if (categoryId) where.categoryId = parseInt(categoryId as string);
     if (type) where.type = type;
     if (isActive !== undefined) where.isActive = isActive === "true";
 
@@ -29,11 +23,22 @@ export async function getProducts(req: Request, res: Response) {
     const take = parseInt(limit as string);
 
     const [products, total] = await Promise.all([
-      prisma.product.findMany({ where, include: productInclude, orderBy: { createdAt: "desc" }, skip, take }),
+      prisma.product.findMany({
+        where,
+        include: productInclude,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
       prisma.product.count({ where }),
     ]);
 
-    return res.json({ products, total, page: parseInt(page as string), limit: take });
+    return res.json({
+      products,
+      total,
+      page: parseInt(page as string),
+      limit: take,
+    });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }
@@ -58,8 +63,7 @@ export async function getProductById(req: Request, res: Response) {
     const product = await prisma.product.findUnique({
       where: { id },
       include: {
-        category: { select: { id: true, name: true, slug: true } },
-        variants: { orderBy: { isDefault: "desc" as const } }, // include inactive for admin
+        variants: { orderBy: { isDefault: "desc" as const } },
       },
     });
     if (!product) return res.status(404).json({ message: "Product not found" });
@@ -69,23 +73,30 @@ export async function getProductById(req: Request, res: Response) {
   }
 }
 
-// ── Create ────────────────────────────────────────────────────────
-
 export async function createProduct(req: Request, res: Response) {
   try {
     const parsed = createProductSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ message: "Validation error", errors: parsed.error.flatten() });
 
     const { variants, ...productData } = parsed.data;
 
-    // Check slug uniqueness
-    const slugExists = await prisma.product.findUnique({ where: { slug: productData.slug } });
-    if (slugExists) return res.status(409).json({ message: "Slug already exists" });
+    const slugExists = await prisma.product.findUnique({
+      where: { slug: productData.slug },
+    });
+    if (slugExists)
+      return res.status(409).json({ message: "Slug already exists" });
 
-    // Check SKU uniqueness across all incoming variants
     const skus = variants.map((v) => v.sku);
-    const duplicateSku = await prisma.productVariant.findFirst({ where: { sku: { in: skus } } });
-    if (duplicateSku) return res.status(409).json({ message: `SKU already exists: ${duplicateSku.sku}` });
+    const duplicateSku = await prisma.productVariant.findFirst({
+      where: { sku: { in: skus } },
+    });
+    if (duplicateSku)
+      return res
+        .status(409)
+        .json({ message: `SKU already exists: ${duplicateSku.sku}` });
 
     const product = await prisma.$transaction(async (tx) => {
       const created = await tx.product.create({
@@ -100,19 +111,25 @@ export async function createProduct(req: Request, res: Response) {
         include: productInclude,
       });
 
-      // Write initial stock history for variants with stock > 0
       for (const variant of created.variants) {
         if (variant.stock > 0) {
           await tx.stockHistory.create({
-            data: { variantId: variant.id, action: "ADD", quantity: variant.stock, note: "Initial stock" },
+            data: {
+              variantId: variant.id,
+              action: "ADD",
+              quantity: variant.stock,
+              note: "Initial stock",
+            },
           });
         }
       }
 
-      // Sync totalStock
       await syncProductStock(created.id, tx as typeof prisma);
 
-      return tx.product.findUniqueOrThrow({ where: { id: created.id }, include: productInclude });
+      return tx.product.findUniqueOrThrow({
+        where: { id: created.id },
+        include: productInclude,
+      });
     });
 
     return res.status(201).json({ message: "Product created", product });
@@ -121,31 +138,34 @@ export async function createProduct(req: Request, res: Response) {
   }
 }
 
-// ── Update ────────────────────────────────────────────────────────
-
 export async function updateProduct(req: Request, res: Response) {
   try {
     const id = parseInt(req.params.id);
     const parsed = updateProductSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ message: "Validation error", errors: parsed.error.flatten() });
 
     const { variants, ...productData } = parsed.data;
 
-    // Check slug uniqueness (exclude self)
     if (productData.slug) {
       const slugExists = await prisma.product.findFirst({
         where: { slug: productData.slug, NOT: { id } },
       });
-      if (slugExists) return res.status(409).json({ message: "Slug already exists" });
+      if (slugExists)
+        return res.status(409).json({ message: "Slug already exists" });
     }
 
-    // Check SKU uniqueness for new variants (those without id)
     const newVariantSkus = variants.filter((v) => !v.id).map((v) => v.sku);
     if (newVariantSkus.length > 0) {
       const duplicateSku = await prisma.productVariant.findFirst({
         where: { sku: { in: newVariantSkus } },
       });
-      if (duplicateSku) return res.status(409).json({ message: `SKU already exists: ${duplicateSku.sku}` });
+      if (duplicateSku)
+        return res
+          .status(409)
+          .json({ message: `SKU already exists: ${duplicateSku.sku}` });
     }
 
     const product = await prisma.$transaction(async (tx) => {
@@ -157,7 +177,10 @@ export async function updateProduct(req: Request, res: Response) {
       await syncVariants(id, variants, tx as typeof prisma);
       await syncProductStock(id, tx as typeof prisma);
 
-      return tx.product.findUniqueOrThrow({ where: { id }, include: productInclude });
+      return tx.product.findUniqueOrThrow({
+        where: { id },
+        include: productInclude,
+      });
     });
 
     return res.json({ message: "Product updated", product });
@@ -165,8 +188,6 @@ export async function updateProduct(req: Request, res: Response) {
     return res.status(500).json({ message: "Server error", error });
   }
 }
-
-// ── Delete (soft) ─────────────────────────────────────────────────
 
 export async function deleteProduct(req: Request, res: Response) {
   try {
@@ -178,8 +199,6 @@ export async function deleteProduct(req: Request, res: Response) {
   }
 }
 
-// ── Stock Management ──────────────────────────────────────────────
-
 export async function updateVariantStock(req: Request, res: Response) {
   try {
     const variantId = parseInt(req.params.variantId);
@@ -190,12 +209,22 @@ export async function updateVariantStock(req: Request, res: Response) {
     };
 
     if (!action || quantity === undefined) {
-      return res.status(400).json({ message: "action and quantity are required" });
+      return res
+        .status(400)
+        .json({ message: "action and quantity are required" });
     }
 
-    const validActions: StockAction[] = ["ADD", "SALE", "REMOVE", "RETURN", "ADJUSTMENT"];
+    const validActions: StockAction[] = [
+      "ADD",
+      "SALE",
+      "REMOVE",
+      "RETURN",
+      "ADJUSTMENT",
+    ];
     if (!validActions.includes(action)) {
-      return res.status(400).json({ message: `action must be one of: ${validActions.join(", ")}` });
+      return res
+        .status(400)
+        .json({ message: `action must be one of: ${validActions.join(", ")}` });
     }
 
     if (quantity <= 0) {
@@ -203,8 +232,16 @@ export async function updateVariantStock(req: Request, res: Response) {
     }
 
     const newStock = await prisma.$transaction(async (tx) => {
-      const stock = await adjustStock(variantId, action, quantity, note, tx as typeof prisma);
-      const variant = await tx.productVariant.findUniqueOrThrow({ where: { id: variantId } });
+      const stock = await adjustStock(
+        variantId,
+        action,
+        quantity,
+        note,
+        tx as typeof prisma
+      );
+      const variant = await tx.productVariant.findUniqueOrThrow({
+        where: { id: variantId },
+      });
       await syncProductStock(variant.productId, tx as typeof prisma);
       return stock;
     });

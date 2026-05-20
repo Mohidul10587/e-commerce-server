@@ -1,5 +1,5 @@
 export interface VariantInput {
-  id?: number; // present for existing variants on update
+  id?: number;
   title: string;
   size?: string;
   color?: string;
@@ -21,11 +21,10 @@ export interface CreateProductInput {
   seoDescription?: string;
   keywords?: string[];
   type: "seal" | "ink";
-  categoryId: number;
   isActive?: boolean;
   variants: VariantInput[];
 }
 
 export interface UpdateProductInput extends Omit<CreateProductInput, "variants"> {
-  variants: VariantInput[]; // mix of existing (with id) and new (without id)
+  variants: VariantInput[];
 }

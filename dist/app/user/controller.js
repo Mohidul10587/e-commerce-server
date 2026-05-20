@@ -26,10 +26,11 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const prisma_1 = __importDefault(require("../../lib/prisma"));
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
+const IS_PROD = process.env.NODE_ENV === "production";
 const COOKIE_OPTIONS = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: IS_PROD,
+    sameSite: (IS_PROD ? "none" : "lax"),
     maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 function signToken(user) {
@@ -114,7 +115,7 @@ function refresh(req, res) {
 }
 function logout(_req, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        res.clearCookie("token");
+        res.clearCookie("token", COOKIE_OPTIONS);
         return res.json({ message: "Logged out" });
     });
 }
@@ -167,7 +168,7 @@ function createUser(req, res) {
                 return res.status(409).json({ message: "Phone already registered" });
             const hashed = yield bcrypt_1.default.hash(password, 10);
             const user = yield prisma_1.default.user.create({
-                data: { name, phone, password: hashed, role: role || "designer" },
+                data: { name, phone, password: hashed, role: role || "customer" },
             });
             return res.status(201).json({ message: "User created", user: safeUser(user) });
         }

@@ -23,7 +23,6 @@ export const createProductSchema = z.object({
   seoDescription: z.string().optional(),
   keywords: z.array(z.string()).optional(),
   type: z.enum(["seal", "ink"]),
-  categoryId: z.number().int().positive(),
   isActive: z.boolean().optional(),
   variants: z.array(variantSchema).min(1, "At least one variant is required"),
 }).refine(
