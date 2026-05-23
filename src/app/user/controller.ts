@@ -107,13 +107,32 @@ export async function logout(_req: Request, res: Response) {
 export async function getUsers(req: Request, res: Response) {
   if (!requireAdmin(req, res)) return;
   try {
-    const { trash } = req.query;
-    const users = await prisma.user.findMany({
-      where: { isTrashed: trash === "true" },
-      select: { id: true, name: true, phone: true, role: true, isTrashed: true, image: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-    });
-    return res.json({ users });
+    const { trash, search, page = "1", limit = "20" } = req.query;
+    const where: any = { isTrashed: trash === "true" };
+
+    if (search) {
+      const s = search as string;
+      where.OR = [
+        { name: { contains: s, mode: "insensitive" } },
+        { phone: { contains: s, mode: "insensitive" } },
+      ];
+    }
+
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = parseInt(limit as string);
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: { id: true, name: true, phone: true, role: true, isTrashed: true, image: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return res.json({ users, total, page: parseInt(page as string), limit: take });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }

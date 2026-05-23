@@ -65,7 +65,7 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.createOrder = createOrder;
 const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { trash, search } = req.query;
+        const { trash, search, page = "1", limit = "10" } = req.query;
         const where = { isTrashed: trash === "true" };
         if (search) {
             const s = search;
@@ -75,8 +75,13 @@ const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 { city: { contains: s, mode: "insensitive" } },
             ];
         }
-        const orders = yield prisma_1.prisma.order.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" } });
-        return res.json({ orders });
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const take = parseInt(limit);
+        const [orders, total] = yield Promise.all([
+            prisma_1.prisma.order.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" }, skip, take }),
+            prisma_1.prisma.order.count({ where }),
+        ]);
+        return res.json({ orders, total, page: parseInt(page), limit: take });
     }
     catch (_a) {
         return res.status(500).json({ message: "Internal server error" });

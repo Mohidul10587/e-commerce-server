@@ -147,13 +147,28 @@ function getUsers(req, res) {
         if (!requireAdmin(req, res))
             return;
         try {
-            const { trash } = req.query;
-            const users = yield prisma_1.default.user.findMany({
-                where: { isTrashed: trash === "true" },
-                select: { id: true, name: true, phone: true, role: true, isTrashed: true, image: true, createdAt: true },
-                orderBy: { createdAt: "desc" },
-            });
-            return res.json({ users });
+            const { trash, search, page = "1", limit = "20" } = req.query;
+            const where = { isTrashed: trash === "true" };
+            if (search) {
+                const s = search;
+                where.OR = [
+                    { name: { contains: s, mode: "insensitive" } },
+                    { phone: { contains: s, mode: "insensitive" } },
+                ];
+            }
+            const skip = (parseInt(page) - 1) * parseInt(limit);
+            const take = parseInt(limit);
+            const [users, total] = yield Promise.all([
+                prisma_1.default.user.findMany({
+                    where,
+                    select: { id: true, name: true, phone: true, role: true, isTrashed: true, image: true, createdAt: true },
+                    orderBy: { createdAt: "desc" },
+                    skip,
+                    take,
+                }),
+                prisma_1.default.user.count({ where }),
+            ]);
+            return res.json({ users, total, page: parseInt(page), limit: take });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });

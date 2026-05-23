@@ -61,7 +61,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
 export const getOrders = async (req: Request, res: Response) => {
   try {
-    const { trash, search } = req.query;
+    const { trash, search, page = "1", limit = "10" } = req.query;
     const where: any = { isTrashed: trash === "true" };
 
     if (search) {
@@ -73,8 +73,15 @@ export const getOrders = async (req: Request, res: Response) => {
       ];
     }
 
-    const orders = await prisma.order.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" } });
-    return res.json({ orders });
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = parseInt(limit as string);
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" }, skip, take }),
+      prisma.order.count({ where }),
+    ]);
+
+    return res.json({ orders, total, page: parseInt(page as string), limit: take });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
   }
