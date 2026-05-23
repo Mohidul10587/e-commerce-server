@@ -8,3 +8,7 @@ exports.orderRoutes.post("/", order_controller_1.createOrder);
 exports.orderRoutes.get("/", order_controller_1.getOrders);
 exports.orderRoutes.get("/:id", order_controller_1.getOrderById);
 exports.orderRoutes.patch("/:id/status", order_controller_1.updateOrderStatus);
+exports.orderRoutes.put("/:id", order_controller_1.updateOrder);
+exports.orderRoutes.delete("/:id", order_controller_1.moveOrderToTrash);
+exports.orderRoutes.patch("/:id/restore", order_controller_1.restoreOrder);
+exports.orderRoutes.delete("/:id/permanent", order_controller_1.permanentDeleteOrder);

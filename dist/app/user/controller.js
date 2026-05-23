@@ -20,8 +20,9 @@ exports.logout = logout;
 exports.getUsers = getUsers;
 exports.createUser = createUser;
 exports.updateUser = updateUser;
-exports.deleteUser = deleteUser;
-exports.toggleActive = toggleActive;
+exports.moveUserToTrash = moveUserToTrash;
+exports.restoreUser = restoreUser;
+exports.permanentDeleteUser = permanentDeleteUser;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const prisma_1 = __importDefault(require("../../lib/prisma"));
@@ -37,7 +38,26 @@ function signToken(user) {
     return jsonwebtoken_1.default.sign({ id: user.id, phone: user.phone, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
 }
 function safeUser(user) {
-    return { id: user.id, name: user.name, phone: user.phone, role: user.role, isActive: user.isActive, image: user.image };
+    return { id: user.id, name: user.name, phone: user.phone, role: user.role, isTrashed: user.isTrashed, image: user.image };
+}
+function requireAdmin(req, res) {
+    try {
+        const token = req.cookies.token;
+        if (!token) {
+            res.status(401).json({ message: "Unauthorized" });
+            return null;
+        }
+        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        if (decoded.role !== "admin" && decoded.role !== "manager") {
+            res.status(403).json({ message: "Admin only" });
+            return null;
+        }
+        return decoded;
+    }
+    catch (_a) {
+        res.status(401).json({ message: "Token expired" });
+        return null;
+    }
 }
 function login(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -48,6 +68,8 @@ function login(req, res) {
             const user = yield prisma_1.default.user.findUnique({ where: { phone } });
             if (!user)
                 return res.status(404).json({ message: "User not found" });
+            if (user.isTrashed)
+                return res.status(403).json({ message: "Account is deactivated" });
             const isMatch = yield bcrypt_1.default.compare(password, user.password);
             if (!isMatch)
                 return res.status(401).json({ message: "Invalid credentials" });
@@ -120,32 +142,15 @@ function logout(_req, res) {
     });
 }
 // ── Admin: User CRUD ──────────────────────────────────────────────
-function requireAdmin(req, res) {
-    try {
-        const token = req.cookies.token;
-        if (!token) {
-            res.status(401).json({ message: "Unauthorized" });
-            return null;
-        }
-        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-        if (decoded.role !== "admin") {
-            res.status(403).json({ message: "Admin only" });
-            return null;
-        }
-        return decoded;
-    }
-    catch (_a) {
-        res.status(401).json({ message: "Token expired" });
-        return null;
-    }
-}
 function getUsers(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!requireAdmin(req, res))
             return;
         try {
+            const { trash } = req.query;
             const users = yield prisma_1.default.user.findMany({
-                select: { id: true, name: true, phone: true, role: true, isActive: true, image: true, createdAt: true },
+                where: { isTrashed: trash === "true" },
+                select: { id: true, name: true, phone: true, role: true, isTrashed: true, image: true, createdAt: true },
                 orderBy: { createdAt: "desc" },
             });
             return res.json({ users });
@@ -167,9 +172,7 @@ function createUser(req, res) {
             if (existing)
                 return res.status(409).json({ message: "Phone already registered" });
             const hashed = yield bcrypt_1.default.hash(password, 10);
-            const user = yield prisma_1.default.user.create({
-                data: { name, phone, password: hashed, role: role || "customer" },
-            });
+            const user = yield prisma_1.default.user.create({ data: { name, phone, password: hashed, role: role || "customer" } });
             return res.status(201).json({ message: "User created", user: safeUser(user) });
         }
         catch (error) {
@@ -183,7 +186,7 @@ function updateUser(req, res) {
             return;
         try {
             const id = parseInt(req.params.id);
-            const { name, phone, role, isActive, password } = req.body;
+            const { name, phone, role, password } = req.body;
             const data = {};
             if (name)
                 data.name = name;
@@ -191,8 +194,6 @@ function updateUser(req, res) {
                 data.phone = phone;
             if (role)
                 data.role = role;
-            if (typeof isActive === "boolean")
-                data.isActive = isActive;
             if (password)
                 data.password = yield bcrypt_1.default.hash(password, 10);
             const user = yield prisma_1.default.user.update({ where: { id }, data });
@@ -203,31 +204,42 @@ function updateUser(req, res) {
         }
     });
 }
-function deleteUser(req, res) {
+function moveUserToTrash(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!requireAdmin(req, res))
             return;
         try {
             const id = parseInt(req.params.id);
-            yield prisma_1.default.user.delete({ where: { id } });
-            return res.json({ message: "User deleted" });
+            yield prisma_1.default.user.update({ where: { id }, data: { isTrashed: true } });
+            return res.json({ message: "User moved to trash" });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });
         }
     });
 }
-function toggleActive(req, res) {
+function restoreUser(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!requireAdmin(req, res))
             return;
         try {
             const id = parseInt(req.params.id);
-            const user = yield prisma_1.default.user.findUnique({ where: { id } });
-            if (!user)
-                return res.status(404).json({ message: "User not found" });
-            const updated = yield prisma_1.default.user.update({ where: { id }, data: { isActive: !user.isActive } });
-            return res.json({ message: "Updated", user: safeUser(updated) });
+            yield prisma_1.default.user.update({ where: { id }, data: { isTrashed: false } });
+            return res.json({ message: "User restored" });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function permanentDeleteUser(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!requireAdmin(req, res))
+            return;
+        try {
+            const id = parseInt(req.params.id);
+            yield prisma_1.default.user.delete({ where: { id } });
+            return res.json({ message: "User permanently deleted" });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });

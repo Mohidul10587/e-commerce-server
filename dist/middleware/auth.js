@@ -30,8 +30,8 @@ const verifyUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         const user = yield getUserFromToken(req);
         if (!user)
             return res.status(401).json({ message: "Unauthorized" });
-        if (!user.isActive)
-            return res.status(401).json({ message: "Account inactive" });
+        if (user.isTrashed)
+            return res.status(401).json({ message: "Account deactivated" });
         // @ts-ignore
         req.user = user;
         next();

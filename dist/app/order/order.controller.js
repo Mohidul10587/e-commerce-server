@@ -9,16 +9,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = void 0;
+exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = void 0;
 const prisma_1 = require("../../lib/prisma");
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
         const { customerName, customerPhone, address, city, postalCode, country, items, deliveryCharge, note } = req.body;
-        if (!customerName || !customerPhone || !address || !city || !postalCode || !country || !(items === null || items === void 0 ? void 0 : items.length)) {
+        if (!customerName || !customerPhone || !address || !city || !postalCode || !country || !(items === null || items === void 0 ? void 0 : items.length))
             return res.status(400).json({ message: "Missing required fields" });
-        }
-        // Validate variants and compute subtotal
         let subtotal = 0;
         const resolvedItems = [];
         for (const item of items) {
@@ -39,40 +37,21 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             });
         }
         const charge = Number(deliveryCharge) || 0;
-        const total = subtotal + charge;
         const order = yield prisma_1.prisma.order.create({
             data: {
-                customerName,
-                customerPhone,
-                address,
-                city,
-                postalCode,
-                country,
-                subtotal,
-                deliveryCharge: charge,
-                total,
+                customerName, customerPhone, address, city, postalCode, country,
+                subtotal, deliveryCharge: charge, total: subtotal + charge,
                 note: note || null,
                 items: { create: resolvedItems },
             },
             include: { items: true },
         });
-        // Deduct stock
         for (const item of resolvedItems) {
-            yield prisma_1.prisma.productVariant.update({
-                where: { id: item.variantId },
-                data: { stock: { decrement: item.quantity } },
-            });
-            yield prisma_1.prisma.stockHistory.create({
-                data: { variantId: item.variantId, action: "SALE", quantity: item.quantity, note: `Order #${order.id}` },
-            });
+            yield prisma_1.prisma.productVariant.update({ where: { id: item.variantId }, data: { stock: { decrement: item.quantity } } });
+            yield prisma_1.prisma.stockHistory.create({ data: { variantId: item.variantId, action: "SALE", quantity: item.quantity, note: `Order #${order.id}` } });
         }
-        // Update product totalStock
-        const variantIds = resolvedItems.map((i) => i.variantId);
-        const affectedProducts = yield prisma_1.prisma.productVariant.findMany({
-            where: { id: { in: variantIds } },
-            select: { productId: true },
-        });
-        const productIds = [...new Set(affectedProducts.map((v) => v.productId))];
+        const productIds = [...new Set((yield prisma_1.prisma.productVariant.findMany({ where: { id: { in: resolvedItems.map((i) => i.variantId) } }, select: { productId: true } }))
+                .map((v) => v.productId))];
         for (const productId of productIds) {
             const agg = yield prisma_1.prisma.productVariant.aggregate({ where: { productId }, _sum: { stock: true } });
             yield prisma_1.prisma.product.update({ where: { id: productId }, data: { totalStock: (_a = agg._sum.stock) !== null && _a !== void 0 ? _a : 0 } });
@@ -80,17 +59,23 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         return res.status(201).json({ message: "Order placed successfully", order });
     }
     catch (err) {
-        console.error(err);
         return res.status(500).json({ message: "Internal server error" });
     }
 });
 exports.createOrder = createOrder;
-const getOrders = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const orders = yield prisma_1.prisma.order.findMany({
-            include: { items: true },
-            orderBy: { createdAt: "desc" },
-        });
+        const { trash, search } = req.query;
+        const where = { isTrashed: trash === "true" };
+        if (search) {
+            const s = search;
+            where.OR = [
+                { customerName: { contains: s, mode: "insensitive" } },
+                { customerPhone: { contains: s, mode: "insensitive" } },
+                { city: { contains: s, mode: "insensitive" } },
+            ];
+        }
+        const orders = yield prisma_1.prisma.order.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" } });
         return res.json({ orders });
     }
     catch (_a) {
@@ -100,10 +85,7 @@ const getOrders = (_req, res) => __awaiter(void 0, void 0, void 0, function* () 
 exports.getOrders = getOrders;
 const getOrderById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const order = yield prisma_1.prisma.order.findUnique({
-            where: { id: Number(req.params.id) },
-            include: { items: true },
-        });
+        const order = yield prisma_1.prisma.order.findUnique({ where: { id: Number(req.params.id) }, include: { items: true } });
         if (!order)
             return res.status(404).json({ message: "Order not found" });
         return res.json({ order });
@@ -116,10 +98,7 @@ exports.getOrderById = getOrderById;
 const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { status } = req.body;
-        const order = yield prisma_1.prisma.order.update({
-            where: { id: Number(req.params.id) },
-            data: { status },
-        });
+        const order = yield prisma_1.prisma.order.update({ where: { id: Number(req.params.id) }, data: { status } });
         return res.json({ order });
     }
     catch (_a) {
@@ -127,3 +106,62 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.updateOrderStatus = updateOrderStatus;
+const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const id = Number(req.params.id);
+        const { customerName, customerPhone, address, city, postalCode, country, note, status } = req.body;
+        const data = {};
+        if (customerName)
+            data.customerName = customerName;
+        if (customerPhone)
+            data.customerPhone = customerPhone;
+        if (address)
+            data.address = address;
+        if (city)
+            data.city = city;
+        if (postalCode)
+            data.postalCode = postalCode;
+        if (country)
+            data.country = country;
+        if (note !== undefined)
+            data.note = note;
+        if (status)
+            data.status = status;
+        const order = yield prisma_1.prisma.order.update({ where: { id }, data, include: { items: true } });
+        return res.json({ order });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.updateOrder = updateOrder;
+const moveOrderToTrash = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        yield prisma_1.prisma.order.update({ where: { id: Number(req.params.id) }, data: { isTrashed: true } });
+        return res.json({ message: "Order moved to trash" });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.moveOrderToTrash = moveOrderToTrash;
+const restoreOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        yield prisma_1.prisma.order.update({ where: { id: Number(req.params.id) }, data: { isTrashed: false } });
+        return res.json({ message: "Order restored" });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.restoreOrder = restoreOrder;
+const permanentDeleteOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        yield prisma_1.prisma.order.delete({ where: { id: Number(req.params.id) } });
+        return res.json({ message: "Order permanently deleted" });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.permanentDeleteOrder = permanentDeleteOrder;
