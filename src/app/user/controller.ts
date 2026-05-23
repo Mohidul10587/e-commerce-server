@@ -4,9 +4,7 @@ import bcrypt from "bcrypt";
 import prisma from "../../lib/prisma";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
-
 const IS_PROD = process.env.NODE_ENV === "production";
-
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: IS_PROD,
@@ -18,8 +16,21 @@ function signToken(user: { id: number; phone: string; role: string }) {
   return jwt.sign({ id: user.id, phone: user.phone, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
 }
 
-function safeUser(user: { id: number; name: string; phone: string; role: string; isActive: boolean; image: string | null }) {
-  return { id: user.id, name: user.name, phone: user.phone, role: user.role, isActive: user.isActive, image: user.image };
+function safeUser(user: { id: number; name: string; phone: string; role: string; isTrashed: boolean; image: string | null }) {
+  return { id: user.id, name: user.name, phone: user.phone, role: user.role, isTrashed: user.isTrashed, image: user.image };
+}
+
+function requireAdmin(req: Request, res: Response): { id: number; role: string } | null {
+  try {
+    const token = req.cookies.token;
+    if (!token) { res.status(401).json({ message: "Unauthorized" }); return null; }
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: number; role: string };
+    if (decoded.role !== "admin" && decoded.role !== "manager") { res.status(403).json({ message: "Admin only" }); return null; }
+    return decoded;
+  } catch {
+    res.status(401).json({ message: "Token expired" });
+    return null;
+  }
 }
 
 export async function login(req: Request, res: Response) {
@@ -29,6 +40,7 @@ export async function login(req: Request, res: Response) {
 
     const user = await prisma.user.findUnique({ where: { phone } });
     if (!user) return res.status(404).json({ message: "User not found" });
+    if (user.isTrashed) return res.status(403).json({ message: "Account is deactivated" });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
@@ -62,11 +74,9 @@ export async function me(req: Request, res: Response) {
   try {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ message: "Unauthorized" });
-
     const decoded = jwt.verify(token, JWT_SECRET) as { id: number };
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) return res.status(404).json({ message: "User not found" });
-
     return res.json({ user: safeUser(user) });
   } catch {
     return res.status(401).json({ message: "Token expired" });
@@ -77,11 +87,9 @@ export async function refresh(req: Request, res: Response) {
   try {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ message: "Unauthorized" });
-
     const decoded = jwt.verify(token, JWT_SECRET) as { id: number };
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) return res.status(404).json({ message: "User not found" });
-
     res.cookie("token", signToken(user), COOKIE_OPTIONS);
     return res.json({ user: safeUser(user) });
   } catch {
@@ -96,24 +104,13 @@ export async function logout(_req: Request, res: Response) {
 
 // ── Admin: User CRUD ──────────────────────────────────────────────
 
-function requireAdmin(req: Request, res: Response): { id: number } | null {
-  try {
-    const token = req.cookies.token;
-    if (!token) { res.status(401).json({ message: "Unauthorized" }); return null; }
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: number; role: string };
-    if (decoded.role !== "admin") { res.status(403).json({ message: "Admin only" }); return null; }
-    return decoded;
-  } catch {
-    res.status(401).json({ message: "Token expired" });
-    return null;
-  }
-}
-
 export async function getUsers(req: Request, res: Response) {
   if (!requireAdmin(req, res)) return;
   try {
+    const { trash } = req.query;
     const users = await prisma.user.findMany({
-      select: { id: true, name: true, phone: true, role: true, isActive: true, image: true, createdAt: true },
+      where: { isTrashed: trash === "true" },
+      select: { id: true, name: true, phone: true, role: true, isTrashed: true, image: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     });
     return res.json({ users });
@@ -132,9 +129,7 @@ export async function createUser(req: Request, res: Response) {
     if (existing) return res.status(409).json({ message: "Phone already registered" });
 
     const hashed = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: { name, phone, password: hashed, role: role || "customer" },
-    });
+    const user = await prisma.user.create({ data: { name, phone, password: hashed, role: role || "customer" } });
     return res.status(201).json({ message: "User created", user: safeUser(user) });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
@@ -145,13 +140,11 @@ export async function updateUser(req: Request, res: Response) {
   if (!requireAdmin(req, res)) return;
   try {
     const id = parseInt(req.params.id);
-    const { name, phone, role, isActive, password } = req.body;
-
+    const { name, phone, role, password } = req.body;
     const data: any = {};
     if (name) data.name = name;
     if (phone) data.phone = phone;
     if (role) data.role = role;
-    if (typeof isActive === "boolean") data.isActive = isActive;
     if (password) data.password = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.update({ where: { id }, data });
@@ -161,26 +154,34 @@ export async function updateUser(req: Request, res: Response) {
   }
 }
 
-export async function deleteUser(req: Request, res: Response) {
+export async function moveUserToTrash(req: Request, res: Response) {
   if (!requireAdmin(req, res)) return;
   try {
     const id = parseInt(req.params.id);
-    await prisma.user.delete({ where: { id } });
-    return res.json({ message: "User deleted" });
+    await prisma.user.update({ where: { id }, data: { isTrashed: true } });
+    return res.json({ message: "User moved to trash" });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }
 }
 
-export async function toggleActive(req: Request, res: Response) {
+export async function restoreUser(req: Request, res: Response) {
   if (!requireAdmin(req, res)) return;
   try {
     const id = parseInt(req.params.id);
-    const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    await prisma.user.update({ where: { id }, data: { isTrashed: false } });
+    return res.json({ message: "User restored" });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
 
-    const updated = await prisma.user.update({ where: { id }, data: { isActive: !user.isActive } });
-    return res.json({ message: "Updated", user: safeUser(updated) });
+export async function permanentDeleteUser(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.user.delete({ where: { id } });
+    return res.json({ message: "User permanently deleted" });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }

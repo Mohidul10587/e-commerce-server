@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { login, signup, me, refresh, logout, getUsers, createUser, updateUser, deleteUser, toggleActive } from "./controller";
+import {
+  login, signup, me, refresh, logout,
+  getUsers, createUser, updateUser,
+  moveUserToTrash, restoreUser, permanentDeleteUser,
+} from "./controller";
 
 const router = Router();
 
@@ -13,7 +17,8 @@ router.post("/logout", logout);
 router.get("/", getUsers);
 router.post("/", createUser);
 router.put("/:id", updateUser);
-router.delete("/:id", deleteUser);
-router.patch("/:id/toggle-active", toggleActive);
+router.delete("/:id", moveUserToTrash);
+router.patch("/:id/restore", restoreUser);
+router.delete("/:id/permanent", permanentDeleteUser);
 
 export { router as userRoutes };

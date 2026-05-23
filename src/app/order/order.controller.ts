@@ -5,11 +5,9 @@ export const createOrder = async (req: Request, res: Response) => {
   try {
     const { customerName, customerPhone, address, city, postalCode, country, items, deliveryCharge, note } = req.body;
 
-    if (!customerName || !customerPhone || !address || !city || !postalCode || !country || !items?.length) {
+    if (!customerName || !customerPhone || !address || !city || !postalCode || !country || !items?.length)
       return res.status(400).json({ message: "Missing required fields" });
-    }
 
-    // Validate variants and compute subtotal
     let subtotal = 0;
     const resolvedItems: { variantId: number; title: string; price: number; quantity: number }[] = [];
 
@@ -31,43 +29,25 @@ export const createOrder = async (req: Request, res: Response) => {
     }
 
     const charge = Number(deliveryCharge) || 0;
-    const total = subtotal + charge;
-
     const order = await prisma.order.create({
       data: {
-        customerName,
-        customerPhone,
-        address,
-        city,
-        postalCode,
-        country,
-        subtotal,
-        deliveryCharge: charge,
-        total,
+        customerName, customerPhone, address, city, postalCode, country,
+        subtotal, deliveryCharge: charge, total: subtotal + charge,
         note: note || null,
         items: { create: resolvedItems },
       },
       include: { items: true },
     });
 
-    // Deduct stock
     for (const item of resolvedItems) {
-      await prisma.productVariant.update({
-        where: { id: item.variantId },
-        data: { stock: { decrement: item.quantity } },
-      });
-      await prisma.stockHistory.create({
-        data: { variantId: item.variantId, action: "SALE", quantity: item.quantity, note: `Order #${order.id}` },
-      });
+      await prisma.productVariant.update({ where: { id: item.variantId }, data: { stock: { decrement: item.quantity } } });
+      await prisma.stockHistory.create({ data: { variantId: item.variantId, action: "SALE", quantity: item.quantity, note: `Order #${order.id}` } });
     }
 
-    // Update product totalStock
-    const variantIds = resolvedItems.map((i) => i.variantId);
-    const affectedProducts = await prisma.productVariant.findMany({
-      where: { id: { in: variantIds } },
-      select: { productId: true },
-    });
-    const productIds = [...new Set(affectedProducts.map((v) => v.productId))];
+    const productIds = [...new Set(
+      (await prisma.productVariant.findMany({ where: { id: { in: resolvedItems.map((i) => i.variantId) } }, select: { productId: true } }))
+        .map((v) => v.productId)
+    )];
     for (const productId of productIds) {
       const agg = await prisma.productVariant.aggregate({ where: { productId }, _sum: { stock: true } });
       await prisma.product.update({ where: { id: productId }, data: { totalStock: agg._sum.stock ?? 0 } });
@@ -75,17 +55,25 @@ export const createOrder = async (req: Request, res: Response) => {
 
     return res.status(201).json({ message: "Order placed successfully", order });
   } catch (err) {
-    console.error(err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-export const getOrders = async (_req: Request, res: Response) => {
+export const getOrders = async (req: Request, res: Response) => {
   try {
-    const orders = await prisma.order.findMany({
-      include: { items: true },
-      orderBy: { createdAt: "desc" },
-    });
+    const { trash, search } = req.query;
+    const where: any = { isTrashed: trash === "true" };
+
+    if (search) {
+      const s = search as string;
+      where.OR = [
+        { customerName: { contains: s, mode: "insensitive" } },
+        { customerPhone: { contains: s, mode: "insensitive" } },
+        { city: { contains: s, mode: "insensitive" } },
+      ];
+    }
+
+    const orders = await prisma.order.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" } });
     return res.json({ orders });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -94,10 +82,7 @@ export const getOrders = async (_req: Request, res: Response) => {
 
 export const getOrderById = async (req: Request, res: Response) => {
   try {
-    const order = await prisma.order.findUnique({
-      where: { id: Number(req.params.id) },
-      include: { items: true },
-    });
+    const order = await prisma.order.findUnique({ where: { id: Number(req.params.id) }, include: { items: true } });
     if (!order) return res.status(404).json({ message: "Order not found" });
     return res.json({ order });
   } catch {
@@ -108,11 +93,56 @@ export const getOrderById = async (req: Request, res: Response) => {
 export const updateOrderStatus = async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
-    const order = await prisma.order.update({
-      where: { id: Number(req.params.id) },
-      data: { status },
-    });
+    const order = await prisma.order.update({ where: { id: Number(req.params.id) }, data: { status } });
     return res.json({ order });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const updateOrder = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const { customerName, customerPhone, address, city, postalCode, country, note, status } = req.body;
+    const data: any = {};
+    if (customerName) data.customerName = customerName;
+    if (customerPhone) data.customerPhone = customerPhone;
+    if (address) data.address = address;
+    if (city) data.city = city;
+    if (postalCode) data.postalCode = postalCode;
+    if (country) data.country = country;
+    if (note !== undefined) data.note = note;
+    if (status) data.status = status;
+
+    const order = await prisma.order.update({ where: { id }, data, include: { items: true } });
+    return res.json({ order });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const moveOrderToTrash = async (req: Request, res: Response) => {
+  try {
+    await prisma.order.update({ where: { id: Number(req.params.id) }, data: { isTrashed: true } });
+    return res.json({ message: "Order moved to trash" });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const restoreOrder = async (req: Request, res: Response) => {
+  try {
+    await prisma.order.update({ where: { id: Number(req.params.id) }, data: { isTrashed: false } });
+    return res.json({ message: "Order restored" });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const permanentDeleteOrder = async (req: Request, res: Response) => {
+  try {
+    await prisma.order.delete({ where: { id: Number(req.params.id) } });
+    return res.json({ message: "Order permanently deleted" });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
   }

@@ -9,6 +9,7 @@ datasource db {
 
 enum Role {
   admin
+  manager
   support
   designer
   producer
@@ -34,7 +35,7 @@ model User {
   phone     String   @unique
   password  String
   role      Role     @default(customer)
-  isActive  Boolean  @default(false)
+  isTrashed Boolean  @default(false)
   image     String?
   createdAt DateTime @default(now())
 }
@@ -87,7 +88,7 @@ model Product {
   keywords       String[]
   type           ProductType
   totalStock     Int              @default(0)
-  isActive       Boolean          @default(true)
+  isTrashed      Boolean          @default(false)
   variants       ProductVariant[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -145,6 +146,7 @@ model Order {
   deliveryCharge  Float
   total           Float
   status          OrderStatus @default(pending)
+  isTrashed       Boolean     @default(false)
   note            String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
