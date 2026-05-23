@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
+import { io } from "../../index";
 
 export const createOrder = async (req: Request, res: Response) => {
   try {
@@ -54,6 +55,8 @@ export const createOrder = async (req: Request, res: Response) => {
       await prisma.product.update({ where: { id: productId }, data: { totalStock: agg._sum.stock ?? 0 } });
     }
 
+    io.emit("order:new", order);
+
     return res.status(201).json({ message: "Order placed successfully", order });
   } catch (err) {
     return res.status(500).json({ message: "Internal server error" });
@@ -101,7 +104,12 @@ export const getOrderById = async (req: Request, res: Response) => {
 export const updateOrderStatus = async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
-    const order = await prisma.order.update({ where: { id: Number(req.params.id) }, data: { status } });
+    const order = await prisma.order.update({
+      where: { id: Number(req.params.id) },
+      data: { status },
+      include: { items: true },
+    });
+    io.emit("order:updated", order);
     return res.json({ order });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -123,6 +131,7 @@ export const updateOrder = async (req: Request, res: Response) => {
     if (status) data.status = status;
 
     const order = await prisma.order.update({ where: { id }, data, include: { items: true } });
+    io.emit("order:updated", order);
     return res.json({ order });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -143,6 +152,7 @@ export const updateOrderItemSealText = async (req: Request, res: Response) => {
 export const moveOrderToTrash = async (req: Request, res: Response) => {
   try {
     await prisma.order.update({ where: { id: Number(req.params.id) }, data: { isTrashed: true } });
+    io.emit("order:trashed", { id: Number(req.params.id) });
     return res.json({ message: "Order moved to trash" });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -151,7 +161,12 @@ export const moveOrderToTrash = async (req: Request, res: Response) => {
 
 export const restoreOrder = async (req: Request, res: Response) => {
   try {
-    await prisma.order.update({ where: { id: Number(req.params.id) }, data: { isTrashed: false } });
+    const order = await prisma.order.update({
+      where: { id: Number(req.params.id) },
+      data: { isTrashed: false },
+      include: { items: true },
+    });
+    io.emit("order:restored", order);
     return res.json({ message: "Order restored" });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -161,6 +176,7 @@ export const restoreOrder = async (req: Request, res: Response) => {
 export const permanentDeleteOrder = async (req: Request, res: Response) => {
   try {
     await prisma.order.delete({ where: { id: Number(req.params.id) } });
+    io.emit("order:deleted", { id: Number(req.params.id) });
     return res.json({ message: "Order permanently deleted" });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
