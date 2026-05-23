@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = void 0;
 const prisma_1 = require("../../lib/prisma");
+const index_1 = require("../../index");
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -57,6 +58,7 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             const agg = yield prisma_1.prisma.productVariant.aggregate({ where: { productId }, _sum: { stock: true } });
             yield prisma_1.prisma.product.update({ where: { id: productId }, data: { totalStock: (_a = agg._sum.stock) !== null && _a !== void 0 ? _a : 0 } });
         }
+        index_1.io.emit("order:new", order);
         return res.status(201).json({ message: "Order placed successfully", order });
     }
     catch (err) {
@@ -104,7 +106,12 @@ exports.getOrderById = getOrderById;
 const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { status } = req.body;
-        const order = yield prisma_1.prisma.order.update({ where: { id: Number(req.params.id) }, data: { status } });
+        const order = yield prisma_1.prisma.order.update({
+            where: { id: Number(req.params.id) },
+            data: { status },
+            include: { items: true },
+        });
+        index_1.io.emit("order:updated", order);
         return res.json({ order });
     }
     catch (_a) {
@@ -134,6 +141,7 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (status)
             data.status = status;
         const order = yield prisma_1.prisma.order.update({ where: { id }, data, include: { items: true } });
+        index_1.io.emit("order:updated", order);
         return res.json({ order });
     }
     catch (_a) {
@@ -156,6 +164,7 @@ exports.updateOrderItemSealText = updateOrderItemSealText;
 const moveOrderToTrash = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield prisma_1.prisma.order.update({ where: { id: Number(req.params.id) }, data: { isTrashed: true } });
+        index_1.io.emit("order:trashed", { id: Number(req.params.id) });
         return res.json({ message: "Order moved to trash" });
     }
     catch (_a) {
@@ -165,7 +174,12 @@ const moveOrderToTrash = (req, res) => __awaiter(void 0, void 0, void 0, functio
 exports.moveOrderToTrash = moveOrderToTrash;
 const restoreOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield prisma_1.prisma.order.update({ where: { id: Number(req.params.id) }, data: { isTrashed: false } });
+        const order = yield prisma_1.prisma.order.update({
+            where: { id: Number(req.params.id) },
+            data: { isTrashed: false },
+            include: { items: true },
+        });
+        index_1.io.emit("order:restored", order);
         return res.json({ message: "Order restored" });
     }
     catch (_a) {
@@ -176,6 +190,7 @@ exports.restoreOrder = restoreOrder;
 const permanentDeleteOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield prisma_1.prisma.order.delete({ where: { id: Number(req.params.id) } });
+        index_1.io.emit("order:deleted", { id: Number(req.params.id) });
         return res.json({ message: "Order permanently deleted" });
     }
     catch (_a) {
