@@ -12,3 +12,4 @@ exports.orderRoutes.put("/:id", order_controller_1.updateOrder);
 exports.orderRoutes.delete("/:id", order_controller_1.moveOrderToTrash);
 exports.orderRoutes.patch("/:id/restore", order_controller_1.restoreOrder);
 exports.orderRoutes.delete("/:id/permanent", order_controller_1.permanentDeleteOrder);
+exports.orderRoutes.patch("/items/:itemId/seal-text", order_controller_1.updateOrderItemSealText);

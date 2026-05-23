@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = void 0;
+exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = void 0;
 const prisma_1 = require("../../lib/prisma");
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -34,6 +34,7 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 title: `${variant.product.title} — ${variant.title}`,
                 price: variant.salePrice,
                 quantity: item.quantity,
+                sealText: variant.product.type === "seal" ? (item.sealText || null) : null,
             });
         }
         const charge = Number(deliveryCharge) || 0;
@@ -140,6 +141,18 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.updateOrder = updateOrder;
+const updateOrderItemSealText = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const itemId = Number(req.params.itemId);
+        const { sealText } = req.body;
+        const item = yield prisma_1.prisma.orderItem.update({ where: { id: itemId }, data: { sealText: sealText !== null && sealText !== void 0 ? sealText : null } });
+        return res.json({ item });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.updateOrderItemSealText = updateOrderItemSealText;
 const moveOrderToTrash = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield prisma_1.prisma.order.update({ where: { id: Number(req.params.id) }, data: { isTrashed: true } });

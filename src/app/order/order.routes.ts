@@ -3,6 +3,7 @@ import {
   createOrder, getOrders, getOrderById,
   updateOrderStatus, updateOrder,
   moveOrderToTrash, restoreOrder, permanentDeleteOrder,
+  updateOrderItemSealText,
 } from "./order.controller";
 
 export const orderRoutes = Router();
@@ -15,3 +16,4 @@ orderRoutes.put("/:id", updateOrder);
 orderRoutes.delete("/:id", moveOrderToTrash);
 orderRoutes.patch("/:id/restore", restoreOrder);
 orderRoutes.delete("/:id/permanent", permanentDeleteOrder);
+orderRoutes.patch("/items/:itemId/seal-text", updateOrderItemSealText);

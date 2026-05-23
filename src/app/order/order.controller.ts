@@ -9,7 +9,7 @@ export const createOrder = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Missing required fields" });
 
     let subtotal = 0;
-    const resolvedItems: { variantId: number; title: string; price: number; quantity: number }[] = [];
+    const resolvedItems: { variantId: number; title: string; price: number; quantity: number; sealText: string | null }[] = [];
 
     for (const item of items) {
       const variant = await prisma.productVariant.findUnique({
@@ -25,6 +25,7 @@ export const createOrder = async (req: Request, res: Response) => {
         title: `${variant.product.title} — ${variant.title}`,
         price: variant.salePrice,
         quantity: item.quantity,
+        sealText: variant.product.type === "seal" ? (item.sealText || null) : null,
       });
     }
 
@@ -123,6 +124,17 @@ export const updateOrder = async (req: Request, res: Response) => {
 
     const order = await prisma.order.update({ where: { id }, data, include: { items: true } });
     return res.json({ order });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const updateOrderItemSealText = async (req: Request, res: Response) => {
+  try {
+    const itemId = Number(req.params.itemId);
+    const { sealText } = req.body;
+    const item = await prisma.orderItem.update({ where: { id: itemId }, data: { sealText: sealText ?? null } });
+    return res.json({ item });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
   }
