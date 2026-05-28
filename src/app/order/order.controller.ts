@@ -65,7 +65,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
 export const getOrders = async (req: Request, res: Response) => {
   try {
-    const { trash, search, page = "1", limit = "10" } = req.query;
+    const { trash, search, page = "1", limit = "10", status, payment } = req.query;
     const where: any = { isTrashed: trash === "true" };
 
     if (search) {
@@ -76,6 +76,9 @@ export const getOrders = async (req: Request, res: Response) => {
         { city: { contains: s, mode: "insensitive" } },
       ];
     }
+
+    if (status) where.status = status;
+    if (payment) where.paymentStatus = payment;
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = parseInt(limit as string);

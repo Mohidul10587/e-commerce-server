@@ -13,9 +13,17 @@ const productInclude = {
 
 export async function getProducts(req: Request, res: Response) {
   try {
-    const { type, page = "1", limit = "20", trash } = req.query;
+    const { type, page = "1", limit = "20", trash, search } = req.query;
     const where: any = { isTrashed: trash === "true" };
     if (type) where.type = type;
+    if (search) {
+      const s = search as string;
+      where.OR = [
+        { title: { contains: s, mode: "insensitive" } },
+        { slug: { contains: s, mode: "insensitive" } },
+        { variants: { some: { sku: { contains: s, mode: "insensitive" } } } },
+      ];
+    }
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = parseInt(limit as string);

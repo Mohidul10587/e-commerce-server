@@ -119,7 +119,7 @@ export async function logout(_req: Request, res: Response) {
 export async function getUsers(req: Request, res: Response) {
   if (!requireAdmin(req, res)) return;
   try {
-    const { trash, search, page = "1", limit = "20" } = req.query;
+    const { trash, search, page = "1", limit = "20", role } = req.query;
     const where: any = { isTrashed: trash === "true" };
 
     if (search) {
@@ -129,6 +129,8 @@ export async function getUsers(req: Request, res: Response) {
         { phone: { contains: s, mode: "insensitive" } },
       ];
     }
+
+    if (role) where.role = role;
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = parseInt(limit as string);
