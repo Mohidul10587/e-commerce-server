@@ -86,14 +86,26 @@ export async function me(req: Request, res: Response) {
 export async function refresh(req: Request, res: Response) {
   try {
     const token = req.cookies.token;
-    if (!token) return res.status(401).json({ message: "Unauthorized" });
+
+    // Missing token
+    if (!token) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      return res.status(401).json({ success: false, message: "Session expired. Please login again.", logout: true });
+    }
+
     const decoded = jwt.verify(token, JWT_SECRET) as { id: number };
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      return res.status(401).json({ success: false, message: "Session expired. Please login again.", logout: true });
+    }
+
     res.cookie("token", signToken(user), COOKIE_OPTIONS);
     return res.json({ user: safeUser(user) });
   } catch {
-    return res.status(401).json({ message: "Token expired" });
+    // Expired, invalid, or malformed token
+    res.clearCookie("token", COOKIE_OPTIONS);
+    return res.status(401).json({ success: false, message: "Session expired. Please login again.", logout: true });
   }
 }
 

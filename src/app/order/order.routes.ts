@@ -4,9 +4,15 @@ import {
   updateOrderStatus, updateOrder,
   moveOrderToTrash, restoreOrder, permanentDeleteOrder,
   updateOrderItemSealText,
+  bulkTrashOrders, bulkRestoreOrders, bulkUpdateOrderStatus,
 } from "./order.controller";
 
 export const orderRoutes = Router();
+
+// Bulk routes (must be before /:id)
+orderRoutes.post("/bulk/trash", bulkTrashOrders);
+orderRoutes.post("/bulk/restore", bulkRestoreOrders);
+orderRoutes.post("/bulk/status", bulkUpdateOrderStatus);
 
 orderRoutes.post("/", createOrder);
 orderRoutes.get("/", getOrders);

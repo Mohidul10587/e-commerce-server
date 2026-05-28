@@ -182,3 +182,45 @@ export const permanentDeleteOrder = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const bulkTrashOrders = async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0)
+      return res.status(400).json({ message: "ids array is required" });
+
+    await prisma.order.updateMany({ where: { id: { in: ids } }, data: { isTrashed: true } });
+    io.emit("order:trashed", { ids });
+    return res.json({ message: `${ids.length} orders moved to trash` });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const bulkRestoreOrders = async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0)
+      return res.status(400).json({ message: "ids array is required" });
+
+    await prisma.order.updateMany({ where: { id: { in: ids } }, data: { isTrashed: false } });
+    io.emit("order:restored", { ids });
+    return res.json({ message: `${ids.length} orders restored` });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const bulkUpdateOrderStatus = async (req: Request, res: Response) => {
+  try {
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0 || !status)
+      return res.status(400).json({ message: "ids array and status are required" });
+
+    await prisma.order.updateMany({ where: { id: { in: ids } }, data: { status } });
+    io.emit("order:updated", { ids, status });
+    return res.json({ message: `${ids.length} orders updated to "${status}"` });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};

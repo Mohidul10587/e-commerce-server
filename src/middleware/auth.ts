@@ -3,6 +3,23 @@ import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
+const IS_PROD = process.env.NODE_ENV === "production";
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: IS_PROD,
+  sameSite: (IS_PROD ? "none" : "lax") as "none" | "lax",
+};
+
+/** Clears the token cookie and returns a standardised session-expired response. */
+function sessionExpired(res: Response) {
+  res.clearCookie("token", COOKIE_OPTIONS);
+  return res.status(401).json({
+    success: false,
+    message: "Session expired. Please login again.",
+    logout: true,
+  });
+}
 
 async function getUserFromToken(req: Request) {
   const token = req.cookies.token;
@@ -17,15 +34,20 @@ export const verifyUser = async (
   next: NextFunction
 ) => {
   try {
+    const token = req.cookies.token;
+    // Missing or empty token → session expired
+    if (!token) return sessionExpired(res);
+
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    if (!user) return sessionExpired(res);
     if (user.isTrashed)
       return res.status(401).json({ message: "Account deactivated" });
     // @ts-ignore
     req.user = user;
     next();
   } catch {
-    res.status(401).json({ message: "Token expired" });
+    // Covers: expired, invalid signature, malformed token
+    return sessionExpired(res);
   }
 };
 
@@ -35,13 +57,16 @@ export const verifyUserInactive = async (
   next: NextFunction
 ) => {
   try {
+    const token = req.cookies.token;
+    if (!token) return sessionExpired(res);
+
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    if (!user) return sessionExpired(res);
     // @ts-ignore
     req.user = user;
     next();
   } catch {
-    res.status(401).json({ message: "Token expired" });
+    return sessionExpired(res);
   }
 };
 
@@ -51,14 +76,17 @@ export const verifyAdmin = async (
   next: NextFunction
 ) => {
   try {
+    const token = req.cookies.token;
+    if (!token) return sessionExpired(res);
+
     const user = await getUserFromToken(req);
-    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    if (!user) return sessionExpired(res);
     if (user.role !== "admin")
       return res.status(403).json({ message: "Admin access required" });
     // @ts-ignore
     req.user = user;
     next();
   } catch {
-    res.status(401).json({ message: "Token expired" });
+    return sessionExpired(res);
   }
 };
