@@ -133,8 +133,14 @@ enum OrderStatus {
   cancelled
 }
 
+enum PaymentStatus {
+  unpaid
+  partial
+  paid
+}
+
 model Order {
-  id              Int         @id @default(autoincrement())
+  id              Int           @id @default(autoincrement())
   customerName    String
   customerPhone   String
   address         String
@@ -145,11 +151,13 @@ model Order {
   subtotal        Float
   deliveryCharge  Float
   total           Float
-  status          OrderStatus @default(pending)
-  isTrashed       Boolean     @default(false)
+  status          OrderStatus   @default(pending)
+  paidAmount      Float         @default(0)
+  paymentStatus   PaymentStatus @default(unpaid)
+  isTrashed       Boolean       @default(false)
   note            String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model OrderItem {

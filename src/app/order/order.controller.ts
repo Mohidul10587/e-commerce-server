@@ -224,3 +224,33 @@ export const bulkUpdateOrderStatus = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const updateOrderPayment = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const { paidAmount } = req.body;
+
+    if (paidAmount === undefined || isNaN(Number(paidAmount)) || Number(paidAmount) < 0)
+      return res.status(400).json({ message: "Valid paidAmount is required" });
+
+    const paid = Number(paidAmount);
+
+    // Fetch total to compute paymentStatus
+    const existing = await prisma.order.findUnique({ where: { id }, select: { total: true } });
+    if (!existing) return res.status(404).json({ message: "Order not found" });
+
+    const paymentStatus =
+      paid <= 0 ? "unpaid" : paid >= existing.total ? "paid" : "partial";
+
+    const order = await prisma.order.update({
+      where: { id },
+      data: { paidAmount: paid, paymentStatus },
+      include: { items: true },
+    });
+
+    io.emit("order:updated", order);
+    return res.json({ order });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};

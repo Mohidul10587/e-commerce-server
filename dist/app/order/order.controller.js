@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = void 0;
+exports.updateOrderPayment = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = void 0;
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -198,3 +198,70 @@ const permanentDeleteOrder = (req, res) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.permanentDeleteOrder = permanentDeleteOrder;
+const bulkTrashOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0)
+            return res.status(400).json({ message: "ids array is required" });
+        yield prisma_1.prisma.order.updateMany({ where: { id: { in: ids } }, data: { isTrashed: true } });
+        index_1.io.emit("order:trashed", { ids });
+        return res.json({ message: `${ids.length} orders moved to trash` });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.bulkTrashOrders = bulkTrashOrders;
+const bulkRestoreOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0)
+            return res.status(400).json({ message: "ids array is required" });
+        yield prisma_1.prisma.order.updateMany({ where: { id: { in: ids } }, data: { isTrashed: false } });
+        index_1.io.emit("order:restored", { ids });
+        return res.json({ message: `${ids.length} orders restored` });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.bulkRestoreOrders = bulkRestoreOrders;
+const bulkUpdateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { ids, status } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0 || !status)
+            return res.status(400).json({ message: "ids array and status are required" });
+        yield prisma_1.prisma.order.updateMany({ where: { id: { in: ids } }, data: { status } });
+        index_1.io.emit("order:updated", { ids, status });
+        return res.json({ message: `${ids.length} orders updated to "${status}"` });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.bulkUpdateOrderStatus = bulkUpdateOrderStatus;
+const updateOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const id = Number(req.params.id);
+        const { paidAmount } = req.body;
+        if (paidAmount === undefined || isNaN(Number(paidAmount)) || Number(paidAmount) < 0)
+            return res.status(400).json({ message: "Valid paidAmount is required" });
+        const paid = Number(paidAmount);
+        // Fetch total to compute paymentStatus
+        const existing = yield prisma_1.prisma.order.findUnique({ where: { id }, select: { total: true } });
+        if (!existing)
+            return res.status(404).json({ message: "Order not found" });
+        const paymentStatus = paid <= 0 ? "unpaid" : paid >= existing.total ? "paid" : "partial";
+        const order = yield prisma_1.prisma.order.update({
+            where: { id },
+            data: { paidAmount: paid, paymentStatus },
+            include: { items: true },
+        });
+        index_1.io.emit("order:updated", order);
+        return res.json({ order });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.updateOrderPayment = updateOrderPayment;

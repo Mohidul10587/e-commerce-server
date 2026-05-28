@@ -4,10 +4,15 @@ exports.orderRoutes = void 0;
 const express_1 = require("express");
 const order_controller_1 = require("./order.controller");
 exports.orderRoutes = (0, express_1.Router)();
+// Bulk routes (must be before /:id)
+exports.orderRoutes.post("/bulk/trash", order_controller_1.bulkTrashOrders);
+exports.orderRoutes.post("/bulk/restore", order_controller_1.bulkRestoreOrders);
+exports.orderRoutes.post("/bulk/status", order_controller_1.bulkUpdateOrderStatus);
 exports.orderRoutes.post("/", order_controller_1.createOrder);
 exports.orderRoutes.get("/", order_controller_1.getOrders);
 exports.orderRoutes.get("/:id", order_controller_1.getOrderById);
 exports.orderRoutes.patch("/:id/status", order_controller_1.updateOrderStatus);
+exports.orderRoutes.patch("/:id/payment", order_controller_1.updateOrderPayment);
 exports.orderRoutes.put("/:id", order_controller_1.updateOrder);
 exports.orderRoutes.delete("/:id", order_controller_1.moveOrderToTrash);
 exports.orderRoutes.patch("/:id/restore", order_controller_1.restoreOrder);
