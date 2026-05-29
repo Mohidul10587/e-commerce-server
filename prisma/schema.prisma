@@ -143,10 +143,8 @@ model Order {
   id              Int           @id @default(autoincrement())
   customerName    String
   customerPhone   String
+  whatsappPhone   String?
   address         String
-  city            String
-  postalCode      String
-  country         String
   items           OrderItem[]
   subtotal        Float
   deliveryCharge  Float

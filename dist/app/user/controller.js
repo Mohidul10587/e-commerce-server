@@ -154,7 +154,7 @@ function getUsers(req, res) {
         if (!requireAdmin(req, res))
             return;
         try {
-            const { trash, search, page = "1", limit = "20" } = req.query;
+            const { trash, search, page = "1", limit = "20", role } = req.query;
             const where = { isTrashed: trash === "true" };
             if (search) {
                 const s = search;
@@ -163,6 +163,8 @@ function getUsers(req, res) {
                     { phone: { contains: s, mode: "insensitive" } },
                 ];
             }
+            if (role)
+                where.role = role;
             const skip = (parseInt(page) - 1) * parseInt(limit);
             const take = parseInt(limit);
             const [users, total] = yield Promise.all([

@@ -45,10 +45,18 @@ const productInclude = {
 function getProducts(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { type, page = "1", limit = "20", trash } = req.query;
+            const { type, page = "1", limit = "20", trash, search } = req.query;
             const where = { isTrashed: trash === "true" };
             if (type)
                 where.type = type;
+            if (search) {
+                const s = search;
+                where.OR = [
+                    { title: { contains: s, mode: "insensitive" } },
+                    { slug: { contains: s, mode: "insensitive" } },
+                    { variants: { some: { sku: { contains: s, mode: "insensitive" } } } },
+                ];
+            }
             const skip = (parseInt(page) - 1) * parseInt(limit);
             const take = parseInt(limit);
             const [products, total] = yield Promise.all([

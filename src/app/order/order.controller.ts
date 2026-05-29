@@ -4,9 +4,9 @@ import { io } from "../../index";
 
 export const createOrder = async (req: Request, res: Response) => {
   try {
-    const { customerName, customerPhone, address, city, postalCode, country, items, deliveryCharge, note } = req.body;
+    const { customerName, customerPhone, whatsappPhone, address, items, deliveryCharge, note } = req.body;
 
-    if (!customerName || !customerPhone || !address || !city || !postalCode || !country || !items?.length)
+    if (!customerName || !customerPhone || !address || !items?.length)
       return res.status(400).json({ message: "Missing required fields" });
 
     let subtotal = 0;
@@ -33,7 +33,7 @@ export const createOrder = async (req: Request, res: Response) => {
     const charge = Number(deliveryCharge) || 0;
     const order = await prisma.order.create({
       data: {
-        customerName, customerPhone, address, city, postalCode, country,
+        customerName, customerPhone, whatsappPhone: whatsappPhone || null, address,
         subtotal, deliveryCharge: charge, total: subtotal + charge,
         note: note || null,
         items: { create: resolvedItems },
@@ -73,7 +73,6 @@ export const getOrders = async (req: Request, res: Response) => {
       where.OR = [
         { customerName: { contains: s, mode: "insensitive" } },
         { customerPhone: { contains: s, mode: "insensitive" } },
-        { city: { contains: s, mode: "insensitive" } },
       ];
     }
 
@@ -122,14 +121,12 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 export const updateOrder = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const { customerName, customerPhone, address, city, postalCode, country, note, status } = req.body;
+    const { customerName, customerPhone, whatsappPhone, address, note, status } = req.body;
     const data: any = {};
     if (customerName) data.customerName = customerName;
     if (customerPhone) data.customerPhone = customerPhone;
+    if (whatsappPhone !== undefined) data.whatsappPhone = whatsappPhone || null;
     if (address) data.address = address;
-    if (city) data.city = city;
-    if (postalCode) data.postalCode = postalCode;
-    if (country) data.country = country;
     if (note !== undefined) data.note = note;
     if (status) data.status = status;
 

@@ -15,8 +15,8 @@ const index_1 = require("../../index");
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const { customerName, customerPhone, address, city, postalCode, country, items, deliveryCharge, note } = req.body;
-        if (!customerName || !customerPhone || !address || !city || !postalCode || !country || !(items === null || items === void 0 ? void 0 : items.length))
+        const { customerName, customerPhone, whatsappPhone, address, items, deliveryCharge, note } = req.body;
+        if (!customerName || !customerPhone || !address || !(items === null || items === void 0 ? void 0 : items.length))
             return res.status(400).json({ message: "Missing required fields" });
         let subtotal = 0;
         const resolvedItems = [];
@@ -41,7 +41,7 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const charge = Number(deliveryCharge) || 0;
         const order = yield prisma_1.prisma.order.create({
             data: {
-                customerName, customerPhone, address, city, postalCode, country,
+                customerName, customerPhone, whatsappPhone: whatsappPhone || null, address,
                 subtotal, deliveryCharge: charge, total: subtotal + charge,
                 note: note || null,
                 items: { create: resolvedItems },
@@ -68,16 +68,19 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.createOrder = createOrder;
 const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { trash, search, page = "1", limit = "10" } = req.query;
+        const { trash, search, page = "1", limit = "10", status, payment } = req.query;
         const where = { isTrashed: trash === "true" };
         if (search) {
             const s = search;
             where.OR = [
                 { customerName: { contains: s, mode: "insensitive" } },
                 { customerPhone: { contains: s, mode: "insensitive" } },
-                { city: { contains: s, mode: "insensitive" } },
             ];
         }
+        if (status)
+            where.status = status;
+        if (payment)
+            where.paymentStatus = payment;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
         const [orders, total] = yield Promise.all([
@@ -122,20 +125,16 @@ exports.updateOrderStatus = updateOrderStatus;
 const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const id = Number(req.params.id);
-        const { customerName, customerPhone, address, city, postalCode, country, note, status } = req.body;
+        const { customerName, customerPhone, whatsappPhone, address, note, status } = req.body;
         const data = {};
         if (customerName)
             data.customerName = customerName;
         if (customerPhone)
             data.customerPhone = customerPhone;
+        if (whatsappPhone !== undefined)
+            data.whatsappPhone = whatsappPhone || null;
         if (address)
             data.address = address;
-        if (city)
-            data.city = city;
-        if (postalCode)
-            data.postalCode = postalCode;
-        if (country)
-            data.country = country;
         if (note !== undefined)
             data.note = note;
         if (status)
