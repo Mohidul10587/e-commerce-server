@@ -63,6 +63,9 @@ model GeneralSettings {
   metaKeywords    String[]
   metaImage       String?
   footerText      String?
+  deliveryFree            Boolean  @default(false)
+  deliveryInsideDhaka     Float    @default(60)
+  deliveryOutsideDhaka    Float    @default(120)
   banners         Banner[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

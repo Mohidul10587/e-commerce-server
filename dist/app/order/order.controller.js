@@ -151,9 +151,10 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.updateOrderStatus = updateOrderStatus;
 const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
         const id = Number(req.params.id);
-        const { customerName, customerPhone, whatsappPhone, address, note, status } = req.body;
+        const { customerName, customerPhone, whatsappPhone, address, note, status, discount, paidAmount } = req.body;
         const data = {};
         if (customerName)
             data.customerName = customerName;
@@ -167,11 +168,25 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             data.note = note;
         if (status)
             data.status = status;
+        if (discount !== undefined && !isNaN(Number(discount)) && Number(discount) >= 0) {
+            const existing = yield prisma_1.prisma.order.findUnique({ where: { id }, select: { subtotal: true, deliveryCharge: true } });
+            if (existing) {
+                data.discount = Number(discount);
+                data.total = existing.subtotal + existing.deliveryCharge - Number(discount);
+            }
+        }
+        if (paidAmount !== undefined && !isNaN(Number(paidAmount)) && Number(paidAmount) >= 0) {
+            const existing = yield prisma_1.prisma.order.findUnique({ where: { id }, select: { total: true } });
+            const total = (_b = (_a = data.total) !== null && _a !== void 0 ? _a : existing === null || existing === void 0 ? void 0 : existing.total) !== null && _b !== void 0 ? _b : 0;
+            const paid = Number(paidAmount);
+            data.paidAmount = paid;
+            data.paymentStatus = paid <= 0 ? "unpaid" : paid >= total ? "paid" : "partial";
+        }
         const order = yield prisma_1.prisma.order.update({ where: { id }, data, include: { items: true } });
         index_1.io.emit("order:updated", order);
         return res.json({ order });
     }
-    catch (_a) {
+    catch (_c) {
         return res.status(500).json({ message: "Internal server error" });
     }
 });
