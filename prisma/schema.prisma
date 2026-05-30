@@ -158,6 +158,7 @@ model Order {
   deliveryCharge  Float
   total           Float
   status          OrderStatus   @default(Processing)
+  discount        Float         @default(0)
   paidAmount      Float         @default(0)
   paymentStatus   PaymentStatus @default(unpaid)
   isTrashed       Boolean       @default(false)

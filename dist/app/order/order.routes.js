@@ -14,6 +14,7 @@ exports.orderRoutes.get("/", order_controller_1.getOrders);
 exports.orderRoutes.get("/:id", order_controller_1.getOrderById);
 exports.orderRoutes.patch("/:id/status", order_controller_1.updateOrderStatus);
 exports.orderRoutes.patch("/:id/payment", order_controller_1.updateOrderPayment);
+exports.orderRoutes.patch("/:id/discount", order_controller_1.updateOrderDiscount);
 exports.orderRoutes.put("/:id", order_controller_1.updateOrder);
 exports.orderRoutes.delete("/:id", order_controller_1.moveOrderToTrash);
 exports.orderRoutes.patch("/:id/restore", order_controller_1.restoreOrder);

@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateOrderPayment = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
+exports.updateOrderPayment = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
 const VALID_STATUSES = [
@@ -19,13 +19,20 @@ const VALID_STATUSES = [
 ];
 const getOrderStatusCounts = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const [all, trash, ...statusCounts] = yield Promise.all([
+        const [all, trash, ...rest] = yield Promise.all([
             prisma_1.prisma.order.count({ where: { isTrashed: false } }),
             prisma_1.prisma.order.count({ where: { isTrashed: true } }),
             ...VALID_STATUSES.map((s) => prisma_1.prisma.order.count({ where: { isTrashed: false, status: s } })),
+            prisma_1.prisma.order.count({ where: { isTrashed: false, paymentStatus: "unpaid" } }),
+            prisma_1.prisma.order.count({ where: { isTrashed: false, paymentStatus: "partial" } }),
+            prisma_1.prisma.order.count({ where: { isTrashed: false, paymentStatus: "paid" } }),
         ]);
         const counts = { all, trash };
-        VALID_STATUSES.forEach((s, i) => { counts[s] = statusCounts[i]; });
+        VALID_STATUSES.forEach((s, i) => { counts[s] = rest[i]; });
+        const offset = VALID_STATUSES.length;
+        counts["unpaid"] = rest[offset];
+        counts["partial"] = rest[offset + 1];
+        counts["paid"] = rest[offset + 2];
         return res.json(counts);
     }
     catch (_a) {
@@ -260,6 +267,30 @@ const bulkUpdateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, fu
     }
 });
 exports.bulkUpdateOrderStatus = bulkUpdateOrderStatus;
+const updateOrderDiscount = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const id = Number(req.params.id);
+        const { discount } = req.body;
+        if (discount === undefined || isNaN(Number(discount)) || Number(discount) < 0)
+            return res.status(400).json({ message: "Valid discount is required" });
+        const existing = yield prisma_1.prisma.order.findUnique({ where: { id }, select: { subtotal: true, deliveryCharge: true } });
+        if (!existing)
+            return res.status(404).json({ message: "Order not found" });
+        const d = Number(discount);
+        const total = existing.subtotal + existing.deliveryCharge - d;
+        const order = yield prisma_1.prisma.order.update({
+            where: { id },
+            data: { discount: d, total },
+            include: { items: true },
+        });
+        index_1.io.emit("order:updated", order);
+        return res.json({ order });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.updateOrderDiscount = updateOrderDiscount;
 const updateOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const id = Number(req.params.id);

@@ -151,7 +151,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 export const updateOrder = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const { customerName, customerPhone, whatsappPhone, address, note, status } = req.body;
+    const { customerName, customerPhone, whatsappPhone, address, note, status, discount, paidAmount } = req.body;
     const data: any = {};
     if (customerName) data.customerName = customerName;
     if (customerPhone) data.customerPhone = customerPhone;
@@ -159,6 +159,22 @@ export const updateOrder = async (req: Request, res: Response) => {
     if (address) data.address = address;
     if (note !== undefined) data.note = note;
     if (status) data.status = status;
+
+    if (discount !== undefined && !isNaN(Number(discount)) && Number(discount) >= 0) {
+      const existing = await prisma.order.findUnique({ where: { id }, select: { subtotal: true, deliveryCharge: true } });
+      if (existing) {
+        data.discount = Number(discount);
+        data.total = existing.subtotal + existing.deliveryCharge - Number(discount);
+      }
+    }
+
+    if (paidAmount !== undefined && !isNaN(Number(paidAmount)) && Number(paidAmount) >= 0) {
+      const existing = await prisma.order.findUnique({ where: { id }, select: { total: true } });
+      const total = data.total ?? existing?.total ?? 0;
+      const paid = Number(paidAmount);
+      data.paidAmount = paid;
+      data.paymentStatus = paid <= 0 ? "unpaid" : paid >= total ? "paid" : "partial";
+    }
 
     const order = await prisma.order.update({ where: { id }, data, include: { items: true } });
     io.emit("order:updated", order);
@@ -250,6 +266,31 @@ export const bulkUpdateOrderStatus = async (req: Request, res: Response) => {
     await prisma.order.updateMany({ where: { id: { in: ids } }, data: { status } });
     io.emit("order:updated", { ids, status });
     return res.json({ message: `${ids.length} orders updated to "${status}"` });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const updateOrderDiscount = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const { discount } = req.body;
+    if (discount === undefined || isNaN(Number(discount)) || Number(discount) < 0)
+      return res.status(400).json({ message: "Valid discount is required" });
+
+    const existing = await prisma.order.findUnique({ where: { id }, select: { subtotal: true, deliveryCharge: true } });
+    if (!existing) return res.status(404).json({ message: "Order not found" });
+
+    const d = Number(discount);
+    const total = existing.subtotal + existing.deliveryCharge - d;
+
+    const order = await prisma.order.update({
+      where: { id },
+      data: { discount: d, total },
+      include: { items: true },
+    });
+    io.emit("order:updated", order);
+    return res.json({ order });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
   }
