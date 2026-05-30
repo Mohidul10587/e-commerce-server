@@ -2,6 +2,36 @@ import { Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
 import { io } from "../../index";
 
+const VALID_STATUSES = [
+  "Processing", "WaitForDesign", "DesignSubmitted", "Revision",
+  "CustomerInformed", "NeedToCall", "NoResponse", "OrderConfirmed",
+  "InProduction", "InReview", "Pending", "Delivered", "PartlyDelivered", "Cancel",
+];
+
+export const getOrderStatusCounts = async (_req: Request, res: Response) => {
+  try {
+    const [all, trash, ...rest] = await Promise.all([
+      prisma.order.count({ where: { isTrashed: false } }),
+      prisma.order.count({ where: { isTrashed: true } }),
+      ...VALID_STATUSES.map((s) =>
+        prisma.order.count({ where: { isTrashed: false, status: s as any } })
+      ),
+      prisma.order.count({ where: { isTrashed: false, paymentStatus: "unpaid" } }),
+      prisma.order.count({ where: { isTrashed: false, paymentStatus: "partial" } }),
+      prisma.order.count({ where: { isTrashed: false, paymentStatus: "paid" } }),
+    ]);
+    const counts: Record<string, number> = { all, trash };
+    VALID_STATUSES.forEach((s, i) => { counts[s] = rest[i]; });
+    const offset = VALID_STATUSES.length;
+    counts["unpaid"] = rest[offset];
+    counts["partial"] = rest[offset + 1];
+    counts["paid"] = rest[offset + 2];
+    return res.json(counts);
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 export const createOrder = async (req: Request, res: Response) => {
   try {
     const { customerName, customerPhone, whatsappPhone, address, items, deliveryCharge, note } = req.body;

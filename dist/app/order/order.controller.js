@@ -9,9 +9,30 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateOrderPayment = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = void 0;
+exports.updateOrderPayment = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
+const VALID_STATUSES = [
+    "Processing", "WaitForDesign", "DesignSubmitted", "Revision",
+    "CustomerInformed", "NeedToCall", "NoResponse", "OrderConfirmed",
+    "InProduction", "InReview", "Pending", "Delivered", "PartlyDelivered", "Cancel",
+];
+const getOrderStatusCounts = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const [all, trash, ...statusCounts] = yield Promise.all([
+            prisma_1.prisma.order.count({ where: { isTrashed: false } }),
+            prisma_1.prisma.order.count({ where: { isTrashed: true } }),
+            ...VALID_STATUSES.map((s) => prisma_1.prisma.order.count({ where: { isTrashed: false, status: s } })),
+        ]);
+        const counts = { all, trash };
+        VALID_STATUSES.forEach((s, i) => { counts[s] = statusCounts[i]; });
+        return res.json(counts);
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.getOrderStatusCounts = getOrderStatusCounts;
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {

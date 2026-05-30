@@ -5,6 +5,7 @@ import {
   moveOrderToTrash, restoreOrder, permanentDeleteOrder,
   updateOrderItemSealText,
   bulkTrashOrders, bulkRestoreOrders, bulkUpdateOrderStatus,
+  getOrderStatusCounts,
 } from "./order.controller";
 
 export const orderRoutes = Router();
@@ -14,6 +15,7 @@ orderRoutes.post("/bulk/trash", bulkTrashOrders);
 orderRoutes.post("/bulk/restore", bulkRestoreOrders);
 orderRoutes.post("/bulk/status", bulkUpdateOrderStatus);
 
+orderRoutes.get("/counts", getOrderStatusCounts);
 orderRoutes.post("/", createOrder);
 orderRoutes.get("/", getOrders);
 orderRoutes.get("/:id", getOrderById);

@@ -8,6 +8,7 @@ exports.orderRoutes = (0, express_1.Router)();
 exports.orderRoutes.post("/bulk/trash", order_controller_1.bulkTrashOrders);
 exports.orderRoutes.post("/bulk/restore", order_controller_1.bulkRestoreOrders);
 exports.orderRoutes.post("/bulk/status", order_controller_1.bulkUpdateOrderStatus);
+exports.orderRoutes.get("/counts", order_controller_1.getOrderStatusCounts);
 exports.orderRoutes.post("/", order_controller_1.createOrder);
 exports.orderRoutes.get("/", order_controller_1.getOrders);
 exports.orderRoutes.get("/:id", order_controller_1.getOrderById);

@@ -125,12 +125,20 @@ model StockHistory {
 }
 
 enum OrderStatus {
-  pending
-  confirmed
-  processing
-  shipped
-  delivered
-  cancelled
+  Processing
+  WaitForDesign
+  DesignSubmitted
+  Revision
+  CustomerInformed
+  NeedToCall
+  NoResponse
+  OrderConfirmed
+  InProduction
+  InReview
+  Pending
+  Delivered
+  PartlyDelivered
+  Cancel
 }
 
 enum PaymentStatus {
@@ -149,7 +157,7 @@ model Order {
   subtotal        Float
   deliveryCharge  Float
   total           Float
-  status          OrderStatus   @default(pending)
+  status          OrderStatus   @default(Processing)
   paidAmount      Float         @default(0)
   paymentStatus   PaymentStatus @default(unpaid)
   isTrashed       Boolean       @default(false)
