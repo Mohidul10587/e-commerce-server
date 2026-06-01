@@ -4,6 +4,7 @@ exports.productRoutes = void 0;
 const express_1 = require("express");
 const product_controller_1 = require("./product.controller");
 exports.productRoutes = (0, express_1.Router)();
+exports.productRoutes.get("/free-gift", product_controller_1.getFreeGiftProduct);
 exports.productRoutes.get("/", product_controller_1.getProducts);
 exports.productRoutes.get("/slug/:slug", product_controller_1.getProductBySlug);
 exports.productRoutes.get("/:id", product_controller_1.getProductById);

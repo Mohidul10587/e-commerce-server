@@ -25,6 +25,7 @@ exports.createProductSchema = zod_1.z.object({
     keywords: zod_1.z.array(zod_1.z.string()).optional(),
     type: zod_1.z.enum(["seal", "ink"]),
     isActive: zod_1.z.boolean().optional(),
+    isFreeGift: zod_1.z.boolean().optional(),
     variants: zod_1.z.array(variantSchema).min(1, "At least one variant is required"),
 }).refine((data) => data.variants.filter((v) => v.isDefault).length === 1, { message: "Exactly one variant must be marked as default", path: ["variants"] });
 exports.updateProductSchema = exports.createProductSchema;

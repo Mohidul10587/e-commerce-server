@@ -24,6 +24,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getProducts = getProducts;
+exports.getFreeGiftProduct = getFreeGiftProduct;
 exports.getProductBySlug = getProductBySlug;
 exports.getProductById = getProductById;
 exports.createProduct = createProduct;
@@ -64,6 +65,20 @@ function getProducts(req, res) {
                 prisma_1.default.product.count({ where }),
             ]);
             return res.json({ products, total, page: parseInt(page), limit: take });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function getFreeGiftProduct(_req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const product = yield prisma_1.default.product.findFirst({
+                where: { isFreeGift: true, isTrashed: false },
+                include: productInclude,
+            });
+            return res.json({ product: product !== null && product !== void 0 ? product : null });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });
@@ -118,9 +133,9 @@ function createProduct(req, res) {
             if (duplicateSku)
                 return res.status(409).json({ message: `SKU already exists: ${duplicateSku.sku}` });
             const product = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
-                var _a;
+                var _a, _b;
                 const created = yield tx.product.create({
-                    data: Object.assign(Object.assign({}, productData), { keywords: (_a = productData.keywords) !== null && _a !== void 0 ? _a : [], totalStock: 0, variants: { create: variants.map((_a) => {
+                    data: Object.assign(Object.assign({}, productData), { keywords: (_a = productData.keywords) !== null && _a !== void 0 ? _a : [], isFreeGift: (_b = productData.isFreeGift) !== null && _b !== void 0 ? _b : false, totalStock: 0, variants: { create: variants.map((_a) => {
                                 var { id: _id } = _a, v = __rest(_a, ["id"]);
                                 return v;
                             }) } }),
