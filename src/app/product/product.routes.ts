@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-  getProducts, getProductBySlug, getProductById,
+  getProducts, getProductBySlug, getProductById, getFreeGiftProduct,
   createProduct, updateProduct,
   moveToTrash, restoreFromTrash, permanentDeleteProduct,
   updateVariantStock, getStockHistory,
@@ -8,6 +8,7 @@ import {
 
 export const productRoutes = Router();
 
+productRoutes.get("/free-gift", getFreeGiftProduct);
 productRoutes.get("/", getProducts);
 productRoutes.get("/slug/:slug", getProductBySlug);
 productRoutes.get("/:id", getProductById);

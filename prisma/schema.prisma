@@ -92,6 +92,7 @@ model Product {
   type           ProductType
   totalStock     Int              @default(0)
   isTrashed      Boolean          @default(false)
+  isFreeGift     Boolean          @default(false)
   variants       ProductVariant[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -154,7 +155,6 @@ model Order {
   id              Int           @id @default(autoincrement())
   customerName    String
   customerPhone   String
-  whatsappPhone   String?
   address         String
   items           OrderItem[]
   subtotal        Float
@@ -179,4 +179,5 @@ model OrderItem {
   price       Float
   quantity    Int
   sealText    String?
+  isFreeItem  Boolean @default(false)
 }

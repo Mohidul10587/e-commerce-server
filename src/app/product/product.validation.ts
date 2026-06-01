@@ -24,6 +24,7 @@ export const createProductSchema = z.object({
   keywords: z.array(z.string()).optional(),
   type: z.enum(["seal", "ink"]),
   isActive: z.boolean().optional(),
+  isFreeGift: z.boolean().optional(),
   variants: z.array(variantSchema).min(1, "At least one variant is required"),
 }).refine(
   (data) => data.variants.filter((v) => v.isDefault).length === 1,

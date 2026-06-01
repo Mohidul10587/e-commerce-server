@@ -43,7 +43,7 @@ exports.getOrderStatusCounts = getOrderStatusCounts;
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const { customerName, customerPhone, whatsappPhone, address, items, deliveryCharge, note } = req.body;
+        const { customerName, customerPhone, address, items, deliveryCharge, note } = req.body;
         if (!customerName || !customerPhone || !address || !(items === null || items === void 0 ? void 0 : items.length))
             return res.status(400).json({ message: "Missing required fields" });
         let subtotal = 0;
@@ -69,7 +69,7 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const charge = Number(deliveryCharge) || 0;
         const order = yield prisma_1.prisma.order.create({
             data: {
-                customerName, customerPhone, whatsappPhone: whatsappPhone || null, address,
+                customerName, customerPhone, address,
                 subtotal, deliveryCharge: charge, total: subtotal + charge,
                 note: note || null,
                 items: { create: resolvedItems },
@@ -154,14 +154,12 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     var _a, _b;
     try {
         const id = Number(req.params.id);
-        const { customerName, customerPhone, whatsappPhone, address, note, status, discount, paidAmount } = req.body;
+        const { customerName, customerPhone, address, note, status, discount, paidAmount } = req.body;
         const data = {};
         if (customerName)
             data.customerName = customerName;
         if (customerPhone)
             data.customerPhone = customerPhone;
-        if (whatsappPhone !== undefined)
-            data.whatsappPhone = whatsappPhone || null;
         if (address)
             data.address = address;
         if (note !== undefined)

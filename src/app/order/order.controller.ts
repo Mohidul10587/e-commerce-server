@@ -34,15 +34,16 @@ export const getOrderStatusCounts = async (_req: Request, res: Response) => {
 
 export const createOrder = async (req: Request, res: Response) => {
   try {
-    const { customerName, customerPhone, whatsappPhone, address, items, deliveryCharge, note } = req.body;
+    const { customerName, customerPhone, address, items, deliveryCharge, note } = req.body;
 
     if (!customerName || !customerPhone || !address || !items?.length)
       return res.status(400).json({ message: "Missing required fields" });
 
     let subtotal = 0;
-    const resolvedItems: { variantId: number; title: string; price: number; quantity: number; sealText: string | null }[] = [];
+    const resolvedItems: { variantId: number; title: string; price: number; quantity: number; sealText: string | null; isFreeItem: boolean }[] = [];
 
     for (const item of items) {
+      const isFree = !!item.isFreeItem;
       const variant = await prisma.productVariant.findUnique({
         where: { id: Number(item.variantId) },
         include: { product: true },
@@ -50,20 +51,22 @@ export const createOrder = async (req: Request, res: Response) => {
       if (!variant) return res.status(400).json({ message: `Variant ${item.variantId} not found` });
       if (variant.stock < item.quantity) return res.status(400).json({ message: `Insufficient stock for ${variant.product.title}` });
 
-      subtotal += variant.salePrice * item.quantity;
+      const price = isFree ? 0 : variant.salePrice;
+      subtotal += price * item.quantity;
       resolvedItems.push({
         variantId: variant.id,
         title: `${variant.product.title} — ${variant.title}`,
-        price: variant.salePrice,
+        price,
         quantity: item.quantity,
         sealText: variant.product.type === "seal" ? (item.sealText || null) : null,
+        isFreeItem: isFree,
       });
     }
 
     const charge = Number(deliveryCharge) || 0;
     const order = await prisma.order.create({
       data: {
-        customerName, customerPhone, whatsappPhone: whatsappPhone || null, address,
+        customerName, customerPhone, address,
         subtotal, deliveryCharge: charge, total: subtotal + charge,
         note: note || null,
         items: { create: resolvedItems },
@@ -151,34 +154,186 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 export const updateOrder = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const { customerName, customerPhone, whatsappPhone, address, note, status, discount, paidAmount } = req.body;
+    const { customerName, customerPhone, address, status, discount, paidAmount, items } = req.body;
     const data: any = {};
     if (customerName) data.customerName = customerName;
     if (customerPhone) data.customerPhone = customerPhone;
-    if (whatsappPhone !== undefined) data.whatsappPhone = whatsappPhone || null;
     if (address) data.address = address;
-    if (note !== undefined) data.note = note;
     if (status) data.status = status;
 
-    if (discount !== undefined && !isNaN(Number(discount)) && Number(discount) >= 0) {
-      const existing = await prisma.order.findUnique({ where: { id }, select: { subtotal: true, deliveryCharge: true } });
-      if (existing) {
-        data.discount = Number(discount);
-        data.total = existing.subtotal + existing.deliveryCharge - Number(discount);
+    // Replace items if provided
+    if (Array.isArray(items)) {
+      // Resolve each item's price from DB
+      let subtotal = 0;
+      const resolved: { variantId: number; title: string; price: number; quantity: number; sealText: string | null; isFreeItem: boolean }[] = [];
+      for (const item of items) {
+        const isFree = !!item.isFreeItem;
+        const variant = await prisma.productVariant.findUnique({
+          where: { id: Number(item.variantId) },
+          include: { product: true },
+        });
+        if (!variant) return res.status(400).json({ message: `Variant ${item.variantId} not found` });
+        const qty = Number(item.quantity) || 1;
+        const price = isFree ? 0 : variant.salePrice;
+        subtotal += price * qty;
+        resolved.push({
+          variantId: variant.id,
+          title: `${variant.product.title} — ${variant.title}`,
+          price,
+          quantity: qty,
+          sealText: variant.product.type === "seal" ? (item.sealText || null) : null,
+          isFreeItem: isFree,
+        });
       }
+      // Delete old items and create new ones
+      await prisma.orderItem.deleteMany({ where: { orderId: id } });
+      data.subtotal = subtotal;
+      data.items = { create: resolved };
     }
 
+    const existing = await prisma.order.findUnique({ where: { id }, select: { subtotal: true, deliveryCharge: true, total: true } });
+    if (!existing) return res.status(404).json({ message: "Order not found" });
+
+    const subtotal = data.subtotal ?? existing.subtotal;
+    const deliveryCharge = existing.deliveryCharge;
+    const disc = discount !== undefined && !isNaN(Number(discount)) && Number(discount) >= 0 ? Number(discount) : undefined;
+    if (disc !== undefined) data.discount = disc;
+    const newTotal = subtotal + deliveryCharge - (disc ?? 0);
+    data.total = newTotal;
+
     if (paidAmount !== undefined && !isNaN(Number(paidAmount)) && Number(paidAmount) >= 0) {
-      const existing = await prisma.order.findUnique({ where: { id }, select: { total: true } });
-      const total = data.total ?? existing?.total ?? 0;
       const paid = Number(paidAmount);
       data.paidAmount = paid;
-      data.paymentStatus = paid <= 0 ? "unpaid" : paid >= total ? "paid" : "partial";
+      data.paymentStatus = paid <= 0 ? "unpaid" : paid >= newTotal ? "paid" : "partial";
     }
 
     const order = await prisma.order.update({ where: { id }, data, include: { items: true } });
     io.emit("order:updated", order);
     return res.json({ order });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const addOrderItem = async (req: Request, res: Response) => {
+  try {
+    const orderId = Number(req.params.id);
+    const { variantId, quantity, sealText } = req.body;
+
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: Number(variantId) },
+      include: { product: true },
+    });
+    if (!variant) return res.status(400).json({ message: "Variant not found" });
+
+    const qty = Number(quantity) || 1;
+    const isSeal = variant.product.type === "seal";
+
+    const [item] = await prisma.$transaction([
+      prisma.orderItem.create({
+        data: {
+          orderId,
+          variantId: variant.id,
+          title: `${variant.product.title} — ${variant.title}`,
+          price: variant.salePrice,
+          quantity: qty,
+          sealText: isSeal ? (sealText || null) : null,
+        },
+      }),
+      prisma.order.update({
+        where: { id: orderId },
+        data: { subtotal: { increment: variant.salePrice * qty }, total: { increment: variant.salePrice * qty } },
+      }),
+    ]);
+
+    return res.json({ item });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const removeOrderItem = async (req: Request, res: Response) => {
+  try {
+    const itemId = Number(req.params.itemId);
+    const item = await prisma.orderItem.findUnique({ where: { id: itemId } });
+    if (!item) return res.status(404).json({ message: "Item not found" });
+
+    const deduct = item.price * item.quantity;
+    await prisma.$transaction([
+      prisma.orderItem.delete({ where: { id: itemId } }),
+      prisma.order.update({
+        where: { id: item.orderId },
+        data: { subtotal: { decrement: deduct }, total: { decrement: deduct } },
+      }),
+    ]);
+
+    return res.json({ message: "Item removed" });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const updateOrderItemQuantity = async (req: Request, res: Response) => {
+  try {
+    const itemId = Number(req.params.itemId);
+    const { quantity } = req.body;
+    const qty = Number(quantity);
+    if (!qty || qty < 1) return res.status(400).json({ message: "Invalid quantity" });
+
+    const existing = await prisma.orderItem.findUnique({ where: { id: itemId } });
+    if (!existing) return res.status(404).json({ message: "Item not found" });
+
+    const diff = (qty - existing.quantity) * existing.price;
+    const [item] = await prisma.$transaction([
+      prisma.orderItem.update({ where: { id: itemId }, data: { quantity: qty } }),
+      prisma.order.update({
+        where: { id: existing.orderId },
+        data: { subtotal: { increment: diff }, total: { increment: diff } },
+      }),
+    ]);
+
+    return res.json({ item });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const updateOrderItemVariant = async (req: Request, res: Response) => {
+  try {
+    const itemId = Number(req.params.itemId);
+    const { variantId } = req.body;
+    if (!variantId) return res.status(400).json({ message: "variantId required" });
+
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: Number(variantId) },
+      include: { product: true },
+    });
+    if (!variant) return res.status(404).json({ message: "Variant not found" });
+
+    const existing = await prisma.orderItem.findUnique({ where: { id: itemId } });
+    if (!existing) return res.status(404).json({ message: "Item not found" });
+
+    const priceDiff = (variant.salePrice - existing.price) * existing.quantity;
+    const isSeal = variant.product.type === "seal";
+
+    const [item] = await prisma.$transaction([
+      prisma.orderItem.update({
+        where: { id: itemId },
+        data: {
+          variantId: variant.id,
+          title: `${variant.product.title} — ${variant.title}`,
+          price: variant.salePrice,
+          sealText: isSeal ? existing.sealText : null,
+        },
+      }),
+      prisma.order.update({
+        where: { id: existing.orderId },
+        data: { subtotal: { increment: priceDiff }, total: { increment: priceDiff } },
+      }),
+    ]);
+
+    return res.json({ item });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
   }
