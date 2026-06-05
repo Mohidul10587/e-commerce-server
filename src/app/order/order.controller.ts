@@ -258,6 +258,7 @@ export const updateOrder = async (req: Request, res: Response) => {
       address,
       status,
       discount,
+      discountPercent,
       paidAmount,
       items,
     } = req.body;
@@ -323,6 +324,8 @@ export const updateOrder = async (req: Request, res: Response) => {
         ? Number(discount)
         : undefined;
     if (disc !== undefined) data.discount = disc;
+    if (discountPercent !== undefined && !isNaN(Number(discountPercent)))
+      data.discountPercent = Number(discountPercent);
     const newTotal = subtotal + deliveryCharge - (disc ?? 0);
     data.total = newTotal;
 

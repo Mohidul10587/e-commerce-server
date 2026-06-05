@@ -7,15 +7,19 @@ import {
   bulkTrashOrders, bulkRestoreOrders, bulkUpdateOrderStatus,
   getOrderStatusCounts,
 } from "./order.controller";
+import { verifyUser } from "../../middleware/auth";
 
 export const orderRoutes = Router();
+
+// All order routes require authentication
+orderRoutes.use(verifyUser);
 
 // Bulk routes (must be before /:id)
 orderRoutes.post("/bulk/trash", bulkTrashOrders);
 orderRoutes.post("/bulk/restore", bulkRestoreOrders);
 orderRoutes.post("/bulk/status", bulkUpdateOrderStatus);
 
-// Item-level routes (must be before /:id to avoid conflict)
+// Item-level routes
 orderRoutes.patch("/items/:itemId/seal-text", updateOrderItemSealText);
 orderRoutes.patch("/items/:itemId/quantity", updateOrderItemQuantity);
 orderRoutes.patch("/items/:itemId/variant", updateOrderItemVariant);
