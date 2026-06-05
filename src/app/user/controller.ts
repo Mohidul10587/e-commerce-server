@@ -14,6 +14,12 @@ const COOKIE_OPTIONS = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
+const CLEAR_COOKIE_OPTIONS = {
+  httpOnly: COOKIE_OPTIONS.httpOnly,
+  secure: COOKIE_OPTIONS.secure,
+  sameSite: COOKIE_OPTIONS.sameSite,
+};
+
 function signToken(user: { id: number; phone: string; role: string }) {
   return jwt.sign({ id: user.id, phone: user.phone, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
 }
@@ -92,14 +98,14 @@ export async function refresh(req: Request, res: Response) {
 
     // Missing token
     if (!token) {
-      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("token", CLEAR_COOKIE_OPTIONS);
       return res.status(401).json({ success: false, message: "Session expired. Please login again.", logout: true });
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as { id: number };
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) {
-      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("token", CLEAR_COOKIE_OPTIONS);
       return res.status(401).json({ success: false, message: "Session expired. Please login again.", logout: true });
     }
 
@@ -107,13 +113,13 @@ export async function refresh(req: Request, res: Response) {
     return res.json({ user: safeUser(user) });
   } catch {
     // Expired, invalid, or malformed token
-    res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("token", CLEAR_COOKIE_OPTIONS);
     return res.status(401).json({ success: false, message: "Session expired. Please login again.", logout: true });
   }
 }
 
 export async function logout(_req: Request, res: Response) {
-  res.clearCookie("token", COOKIE_OPTIONS);
+  res.clearCookie("token", CLEAR_COOKIE_OPTIONS);
   return res.json({ message: "Logged out" });
 }
 

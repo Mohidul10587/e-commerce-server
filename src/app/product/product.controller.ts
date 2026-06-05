@@ -70,7 +70,17 @@ export async function getProductBySlug(req: Request, res: Response) {
     });
     if (!product || product.isTrashed)
       return res.status(404).json({ message: "Product not found" });
-    return res.json({ product });
+
+    // Include free gift product if this is a seal product
+    let freeGiftProduct = null;
+    if (product.type === "seal") {
+      freeGiftProduct = await prisma.product.findFirst({
+        where: { isFreeGift: true, isTrashed: false },
+        include: productInclude,
+      });
+    }
+
+    return res.json({ product, freeGiftProduct });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }
@@ -116,6 +126,13 @@ export async function createProduct(req: Request, res: Response) {
         .json({ message: `SKU already exists: ${duplicateSku.sku}` });
 
     const product = await prisma.$transaction(async (tx) => {
+      // Enforce single free gift product
+      if (productData.isFreeGift) {
+        const existing = await tx.product.findFirst({ where: { isFreeGift: true, isTrashed: false } });
+        if (existing)
+          throw Object.assign(new Error(`"${existing.title}" is already marked as the free gift. Remove that tag first.`), { status: 409 });
+      }
+
       const created = await tx.product.create({
         data: {
           ...productData,
@@ -148,7 +165,8 @@ export async function createProduct(req: Request, res: Response) {
     });
 
     return res.status(201).json({ message: "Product created", product });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.status) return res.status(error.status).json({ message: error.message });
     return res.status(500).json({ message: "Server error", error });
   }
 }
@@ -184,6 +202,13 @@ export async function updateProduct(req: Request, res: Response) {
     }
 
     const product = await prisma.$transaction(async (tx) => {
+      // Enforce single free gift product (exclude self when editing)
+      if (productData.isFreeGift) {
+        const existing = await tx.product.findFirst({ where: { isFreeGift: true, isTrashed: false, NOT: { id } } });
+        if (existing)
+          throw Object.assign(new Error(`"${existing.title}" is already marked as the free gift. Remove that tag first.`), { status: 409 });
+      }
+
       await tx.product.update({
         where: { id },
         data: { ...productData, keywords: productData.keywords ?? [] },
@@ -197,7 +222,8 @@ export async function updateProduct(req: Request, res: Response) {
     });
 
     return res.json({ message: "Product updated", product });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.status) return res.status(error.status).json({ message: error.message });
     return res.status(500).json({ message: "Server error", error });
   }
 }
