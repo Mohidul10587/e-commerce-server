@@ -15,7 +15,7 @@ const errorHandler = (err, req, res, next) => {
     return res.status(500).json({
         message: err.message || {
             en: "Internal server error",
-            bn: "অভ্যন্তরীণ সার্ভার ত্রুটি",
+            bn: "Internal server error",
         },
     });
 };

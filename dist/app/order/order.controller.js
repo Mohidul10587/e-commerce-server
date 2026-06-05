@@ -13,9 +13,20 @@ exports.updateOrderPayment = exports.updateOrderDiscount = exports.bulkUpdateOrd
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
 const VALID_STATUSES = [
-    "Processing", "WaitForDesign", "DesignSubmitted", "Revision",
-    "CustomerInformed", "NeedToCall", "NoResponse", "OrderConfirmed",
-    "InProduction", "InReview", "Pending", "Delivered", "PartlyDelivered", "Cancel",
+    "Processing",
+    "WaitForDesign",
+    "DesignSubmitted",
+    "Revision",
+    "CustomerInformed",
+    "NeedToCall",
+    "NoResponse",
+    "OrderConfirmed",
+    "InProduction",
+    "InReview",
+    "Pending",
+    "Delivered",
+    "PartlyDelivered",
+    "Cancel",
 ];
 const getOrderStatusCounts = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -23,12 +34,20 @@ const getOrderStatusCounts = (_req, res) => __awaiter(void 0, void 0, void 0, fu
             prisma_1.prisma.order.count({ where: { isTrashed: false } }),
             prisma_1.prisma.order.count({ where: { isTrashed: true } }),
             ...VALID_STATUSES.map((s) => prisma_1.prisma.order.count({ where: { isTrashed: false, status: s } })),
-            prisma_1.prisma.order.count({ where: { isTrashed: false, paymentStatus: "unpaid" } }),
-            prisma_1.prisma.order.count({ where: { isTrashed: false, paymentStatus: "partial" } }),
-            prisma_1.prisma.order.count({ where: { isTrashed: false, paymentStatus: "paid" } }),
+            prisma_1.prisma.order.count({
+                where: { isTrashed: false, paymentStatus: "unpaid" },
+            }),
+            prisma_1.prisma.order.count({
+                where: { isTrashed: false, paymentStatus: "partial" },
+            }),
+            prisma_1.prisma.order.count({
+                where: { isTrashed: false, paymentStatus: "paid" },
+            }),
         ]);
         const counts = { all, trash };
-        VALID_STATUSES.forEach((s, i) => { counts[s] = rest[i]; });
+        VALID_STATUSES.forEach((s, i) => {
+            counts[s] = rest[i];
+        });
         const offset = VALID_STATUSES.length;
         counts["unpaid"] = rest[offset];
         counts["partial"] = rest[offset + 1];
@@ -43,7 +62,7 @@ exports.getOrderStatusCounts = getOrderStatusCounts;
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const { customerName, customerPhone, address, items, deliveryCharge, note } = req.body;
+        const { customerName, customerPhone, address, items, deliveryCharge, note, discount, discountPercent, } = req.body;
         if (!customerName || !customerPhone || !address || !(items === null || items === void 0 ? void 0 : items.length))
             return res.status(400).json({ message: "Missing required fields" });
         let subtotal = 0;
@@ -55,9 +74,13 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 include: { product: true },
             });
             if (!variant)
-                return res.status(400).json({ message: `Variant ${item.variantId} not found` });
+                return res
+                    .status(400)
+                    .json({ message: `Variant ${item.variantId} not found` });
             if (variant.stock < item.quantity)
-                return res.status(400).json({ message: `Insufficient stock for ${variant.product.title}` });
+                return res
+                    .status(400)
+                    .json({ message: `Insufficient stock for ${variant.product.title}` });
             const price = isFree ? 0 : variant.salePrice;
             subtotal += price * item.quantity;
             resolvedItems.push({
@@ -65,41 +88,72 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 title: `${variant.product.title} — ${variant.title}`,
                 price,
                 quantity: item.quantity,
-                sealText: variant.product.type === "seal" ? (item.sealText || null) : null,
+                sealText: variant.product.type === "seal" ? item.sealText || null : null,
                 isFreeItem: isFree,
             });
         }
         const charge = Number(deliveryCharge) || 0;
+        const disc = Number(discount) >= 0 ? Number(discount) : 0;
+        const discPct = Number(discountPercent) >= 0 ? Number(discountPercent) : 0;
         const order = yield prisma_1.prisma.order.create({
             data: {
-                customerName, customerPhone, address,
-                subtotal, deliveryCharge: charge, total: subtotal + charge,
+                customerName,
+                customerPhone,
+                address,
+                subtotal,
+                deliveryCharge: charge,
+                total: subtotal + charge - disc,
+                discount: disc,
+                discountPercent: discPct,
                 note: note || null,
                 items: { create: resolvedItems },
             },
             include: { items: true },
         });
         for (const item of resolvedItems) {
-            yield prisma_1.prisma.productVariant.update({ where: { id: item.variantId }, data: { stock: { decrement: item.quantity } } });
-            yield prisma_1.prisma.stockHistory.create({ data: { variantId: item.variantId, action: "SALE", quantity: item.quantity, note: `Order #${order.id}` } });
+            yield prisma_1.prisma.productVariant.update({
+                where: { id: item.variantId },
+                data: { stock: { decrement: item.quantity } },
+            });
+            yield prisma_1.prisma.stockHistory.create({
+                data: {
+                    variantId: item.variantId,
+                    action: "SALE",
+                    quantity: item.quantity,
+                    note: `Order #${order.id}`,
+                },
+            });
         }
-        const productIds = [...new Set((yield prisma_1.prisma.productVariant.findMany({ where: { id: { in: resolvedItems.map((i) => i.variantId) } }, select: { productId: true } }))
-                .map((v) => v.productId))];
+        const productIds = [
+            ...new Set((yield prisma_1.prisma.productVariant.findMany({
+                where: { id: { in: resolvedItems.map((i) => i.variantId) } },
+                select: { productId: true },
+            })).map((v) => v.productId)),
+        ];
         for (const productId of productIds) {
-            const agg = yield prisma_1.prisma.productVariant.aggregate({ where: { productId }, _sum: { stock: true } });
-            yield prisma_1.prisma.product.update({ where: { id: productId }, data: { totalStock: (_a = agg._sum.stock) !== null && _a !== void 0 ? _a : 0 } });
+            const agg = yield prisma_1.prisma.productVariant.aggregate({
+                where: { productId },
+                _sum: { stock: true },
+            });
+            yield prisma_1.prisma.product.update({
+                where: { id: productId },
+                data: { totalStock: (_a = agg._sum.stock) !== null && _a !== void 0 ? _a : 0 },
+            });
         }
         index_1.io.emit("order:new", order);
-        return res.status(201).json({ message: "Order placed successfully", order });
+        return res
+            .status(201)
+            .json({ message: "Order placed successfully", order });
     }
     catch (err) {
+        console.log(err);
         return res.status(500).json({ message: "Internal server error" });
     }
 });
 exports.createOrder = createOrder;
 const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { trash, search, page = "1", limit = "10", status, payment } = req.query;
+        const { trash, search, page = "1", limit = "10", status, payment, sort, } = req.query;
         const where = { isTrashed: trash === "true" };
         if (search) {
             const s = search;
@@ -114,11 +168,23 @@ const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             where.paymentStatus = payment;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
+        const orderDir = sort === "asc" ? "asc" : "desc";
         const [orders, total] = yield Promise.all([
-            prisma_1.prisma.order.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" }, skip, take }),
+            prisma_1.prisma.order.findMany({
+                where,
+                include: { items: true },
+                orderBy: { createdAt: orderDir },
+                skip,
+                take,
+            }),
             prisma_1.prisma.order.count({ where }),
         ]);
-        return res.json({ orders, total, page: parseInt(page), limit: take });
+        return res.json({
+            orders,
+            total,
+            page: parseInt(page),
+            limit: take,
+        });
     }
     catch (_a) {
         return res.status(500).json({ message: "Internal server error" });
@@ -127,7 +193,10 @@ const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.getOrders = getOrders;
 const getOrderById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const order = yield prisma_1.prisma.order.findUnique({ where: { id: Number(req.params.id) }, include: { items: true } });
+        const order = yield prisma_1.prisma.order.findUnique({
+            where: { id: Number(req.params.id) },
+            include: { items: true },
+        });
         if (!order)
             return res.status(404).json({ message: "Order not found" });
         return res.json({ order });
@@ -157,7 +226,7 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     var _a;
     try {
         const id = Number(req.params.id);
-        const { customerName, customerPhone, address, status, discount, paidAmount, items } = req.body;
+        const { customerName, customerPhone, address, status, discount, discountPercent, paidAmount, items, } = req.body;
         const data = {};
         if (customerName)
             data.customerName = customerName;
@@ -179,7 +248,9 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                     include: { product: true },
                 });
                 if (!variant)
-                    return res.status(400).json({ message: `Variant ${item.variantId} not found` });
+                    return res
+                        .status(400)
+                        .json({ message: `Variant ${item.variantId} not found` });
                 const qty = Number(item.quantity) || 1;
                 const price = isFree ? 0 : variant.salePrice;
                 subtotal += price * qty;
@@ -188,7 +259,7 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                     title: `${variant.product.title} — ${variant.title}`,
                     price,
                     quantity: qty,
-                    sealText: variant.product.type === "seal" ? (item.sealText || null) : null,
+                    sealText: variant.product.type === "seal" ? item.sealText || null : null,
                     isFreeItem: isFree,
                 });
             }
@@ -197,22 +268,38 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             data.subtotal = subtotal;
             data.items = { create: resolved };
         }
-        const existing = yield prisma_1.prisma.order.findUnique({ where: { id }, select: { subtotal: true, deliveryCharge: true, total: true } });
+        const existing = yield prisma_1.prisma.order.findUnique({
+            where: { id },
+            select: { subtotal: true, deliveryCharge: true, total: true },
+        });
         if (!existing)
             return res.status(404).json({ message: "Order not found" });
         const subtotal = (_a = data.subtotal) !== null && _a !== void 0 ? _a : existing.subtotal;
         const deliveryCharge = existing.deliveryCharge;
-        const disc = discount !== undefined && !isNaN(Number(discount)) && Number(discount) >= 0 ? Number(discount) : undefined;
+        const disc = discount !== undefined &&
+            !isNaN(Number(discount)) &&
+            Number(discount) >= 0
+            ? Number(discount)
+            : undefined;
         if (disc !== undefined)
             data.discount = disc;
+        if (discountPercent !== undefined && !isNaN(Number(discountPercent)))
+            data.discountPercent = Number(discountPercent);
         const newTotal = subtotal + deliveryCharge - (disc !== null && disc !== void 0 ? disc : 0);
         data.total = newTotal;
-        if (paidAmount !== undefined && !isNaN(Number(paidAmount)) && Number(paidAmount) >= 0) {
+        if (paidAmount !== undefined &&
+            !isNaN(Number(paidAmount)) &&
+            Number(paidAmount) >= 0) {
             const paid = Number(paidAmount);
             data.paidAmount = paid;
-            data.paymentStatus = paid <= 0 ? "unpaid" : paid >= newTotal ? "paid" : "partial";
+            data.paymentStatus =
+                paid <= 0 ? "unpaid" : paid >= newTotal ? "paid" : "partial";
         }
-        const order = yield prisma_1.prisma.order.update({ where: { id }, data, include: { items: true } });
+        const order = yield prisma_1.prisma.order.update({
+            where: { id },
+            data,
+            include: { items: true },
+        });
         index_1.io.emit("order:updated", order);
         return res.json({ order });
     }
@@ -242,12 +329,15 @@ const addOrderItem = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                     title: `${variant.product.title} — ${variant.title}`,
                     price: variant.salePrice,
                     quantity: qty,
-                    sealText: isSeal ? (sealText || null) : null,
+                    sealText: isSeal ? sealText || null : null,
                 },
             }),
             prisma_1.prisma.order.update({
                 where: { id: orderId },
-                data: { subtotal: { increment: variant.salePrice * qty }, total: { increment: variant.salePrice * qty } },
+                data: {
+                    subtotal: { increment: variant.salePrice * qty },
+                    total: { increment: variant.salePrice * qty },
+                },
             }),
         ]);
         return res.json({ item });
@@ -285,12 +375,17 @@ const updateOrderItemQuantity = (req, res) => __awaiter(void 0, void 0, void 0, 
         const qty = Number(quantity);
         if (!qty || qty < 1)
             return res.status(400).json({ message: "Invalid quantity" });
-        const existing = yield prisma_1.prisma.orderItem.findUnique({ where: { id: itemId } });
+        const existing = yield prisma_1.prisma.orderItem.findUnique({
+            where: { id: itemId },
+        });
         if (!existing)
             return res.status(404).json({ message: "Item not found" });
         const diff = (qty - existing.quantity) * existing.price;
         const [item] = yield prisma_1.prisma.$transaction([
-            prisma_1.prisma.orderItem.update({ where: { id: itemId }, data: { quantity: qty } }),
+            prisma_1.prisma.orderItem.update({
+                where: { id: itemId },
+                data: { quantity: qty },
+            }),
             prisma_1.prisma.order.update({
                 where: { id: existing.orderId },
                 data: { subtotal: { increment: diff }, total: { increment: diff } },
@@ -315,7 +410,9 @@ const updateOrderItemVariant = (req, res) => __awaiter(void 0, void 0, void 0, f
         });
         if (!variant)
             return res.status(404).json({ message: "Variant not found" });
-        const existing = yield prisma_1.prisma.orderItem.findUnique({ where: { id: itemId } });
+        const existing = yield prisma_1.prisma.orderItem.findUnique({
+            where: { id: itemId },
+        });
         if (!existing)
             return res.status(404).json({ message: "Item not found" });
         const priceDiff = (variant.salePrice - existing.price) * existing.quantity;
@@ -332,7 +429,10 @@ const updateOrderItemVariant = (req, res) => __awaiter(void 0, void 0, void 0, f
             }),
             prisma_1.prisma.order.update({
                 where: { id: existing.orderId },
-                data: { subtotal: { increment: priceDiff }, total: { increment: priceDiff } },
+                data: {
+                    subtotal: { increment: priceDiff },
+                    total: { increment: priceDiff },
+                },
             }),
         ]);
         return res.json({ item });
@@ -346,7 +446,10 @@ const updateOrderItemSealText = (req, res) => __awaiter(void 0, void 0, void 0, 
     try {
         const itemId = Number(req.params.itemId);
         const { sealText } = req.body;
-        const item = yield prisma_1.prisma.orderItem.update({ where: { id: itemId }, data: { sealText: sealText !== null && sealText !== void 0 ? sealText : null } });
+        const item = yield prisma_1.prisma.orderItem.update({
+            where: { id: itemId },
+            data: { sealText: sealText !== null && sealText !== void 0 ? sealText : null },
+        });
         return res.json({ item });
     }
     catch (_a) {
@@ -356,7 +459,10 @@ const updateOrderItemSealText = (req, res) => __awaiter(void 0, void 0, void 0, 
 exports.updateOrderItemSealText = updateOrderItemSealText;
 const moveOrderToTrash = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield prisma_1.prisma.order.update({ where: { id: Number(req.params.id) }, data: { isTrashed: true } });
+        yield prisma_1.prisma.order.update({
+            where: { id: Number(req.params.id) },
+            data: { isTrashed: true },
+        });
         index_1.io.emit("order:trashed", { id: Number(req.params.id) });
         return res.json({ message: "Order moved to trash" });
     }
@@ -396,7 +502,10 @@ const bulkTrashOrders = (req, res) => __awaiter(void 0, void 0, void 0, function
         const { ids } = req.body;
         if (!Array.isArray(ids) || ids.length === 0)
             return res.status(400).json({ message: "ids array is required" });
-        yield prisma_1.prisma.order.updateMany({ where: { id: { in: ids } }, data: { isTrashed: true } });
+        yield prisma_1.prisma.order.updateMany({
+            where: { id: { in: ids } },
+            data: { isTrashed: true },
+        });
         index_1.io.emit("order:trashed", { ids });
         return res.json({ message: `${ids.length} orders moved to trash` });
     }
@@ -410,7 +519,10 @@ const bulkRestoreOrders = (req, res) => __awaiter(void 0, void 0, void 0, functi
         const { ids } = req.body;
         if (!Array.isArray(ids) || ids.length === 0)
             return res.status(400).json({ message: "ids array is required" });
-        yield prisma_1.prisma.order.updateMany({ where: { id: { in: ids } }, data: { isTrashed: false } });
+        yield prisma_1.prisma.order.updateMany({
+            where: { id: { in: ids } },
+            data: { isTrashed: false },
+        });
         index_1.io.emit("order:restored", { ids });
         return res.json({ message: `${ids.length} orders restored` });
     }
@@ -423,8 +535,13 @@ const bulkUpdateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, fu
     try {
         const { ids, status } = req.body;
         if (!Array.isArray(ids) || ids.length === 0 || !status)
-            return res.status(400).json({ message: "ids array and status are required" });
-        yield prisma_1.prisma.order.updateMany({ where: { id: { in: ids } }, data: { status } });
+            return res
+                .status(400)
+                .json({ message: "ids array and status are required" });
+        yield prisma_1.prisma.order.updateMany({
+            where: { id: { in: ids } },
+            data: { status },
+        });
         index_1.io.emit("order:updated", { ids, status });
         return res.json({ message: `${ids.length} orders updated to "${status}"` });
     }
@@ -436,17 +553,25 @@ exports.bulkUpdateOrderStatus = bulkUpdateOrderStatus;
 const updateOrderDiscount = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const id = Number(req.params.id);
-        const { discount } = req.body;
-        if (discount === undefined || isNaN(Number(discount)) || Number(discount) < 0)
+        const { discount, discountPercent } = req.body;
+        if (discount === undefined ||
+            isNaN(Number(discount)) ||
+            Number(discount) < 0)
             return res.status(400).json({ message: "Valid discount is required" });
-        const existing = yield prisma_1.prisma.order.findUnique({ where: { id }, select: { subtotal: true, deliveryCharge: true } });
+        const existing = yield prisma_1.prisma.order.findUnique({
+            where: { id },
+            select: { subtotal: true, deliveryCharge: true },
+        });
         if (!existing)
             return res.status(404).json({ message: "Order not found" });
         const d = Number(discount);
+        const dp = discountPercent !== undefined && !isNaN(Number(discountPercent))
+            ? Number(discountPercent)
+            : 0;
         const total = existing.subtotal + existing.deliveryCharge - d;
         const order = yield prisma_1.prisma.order.update({
             where: { id },
-            data: { discount: d, total },
+            data: { discount: d, discountPercent: dp, total },
             include: { items: true },
         });
         index_1.io.emit("order:updated", order);
@@ -461,11 +586,16 @@ const updateOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, funct
     try {
         const id = Number(req.params.id);
         const { paidAmount } = req.body;
-        if (paidAmount === undefined || isNaN(Number(paidAmount)) || Number(paidAmount) < 0)
+        if (paidAmount === undefined ||
+            isNaN(Number(paidAmount)) ||
+            Number(paidAmount) < 0)
             return res.status(400).json({ message: "Valid paidAmount is required" });
         const paid = Number(paidAmount);
         // Fetch total to compute paymentStatus
-        const existing = yield prisma_1.prisma.order.findUnique({ where: { id }, select: { total: true } });
+        const existing = yield prisma_1.prisma.order.findUnique({
+            where: { id },
+            select: { total: true },
+        });
         if (!existing)
             return res.status(404).json({ message: "Order not found" });
         const paymentStatus = paid <= 0 ? "unpaid" : paid >= existing.total ? "paid" : "partial";

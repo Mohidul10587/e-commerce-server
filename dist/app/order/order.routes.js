@@ -3,12 +3,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.orderRoutes = void 0;
 const express_1 = require("express");
 const order_controller_1 = require("./order.controller");
+const auth_1 = require("../../middleware/auth");
 exports.orderRoutes = (0, express_1.Router)();
+// All order routes require authentication
+exports.orderRoutes.use(auth_1.verifyUser);
 // Bulk routes (must be before /:id)
 exports.orderRoutes.post("/bulk/trash", order_controller_1.bulkTrashOrders);
 exports.orderRoutes.post("/bulk/restore", order_controller_1.bulkRestoreOrders);
 exports.orderRoutes.post("/bulk/status", order_controller_1.bulkUpdateOrderStatus);
-// Item-level routes (must be before /:id to avoid conflict)
+// Item-level routes
 exports.orderRoutes.patch("/items/:itemId/seal-text", order_controller_1.updateOrderItemSealText);
 exports.orderRoutes.patch("/items/:itemId/quantity", order_controller_1.updateOrderItemQuantity);
 exports.orderRoutes.patch("/items/:itemId/variant", order_controller_1.updateOrderItemVariant);

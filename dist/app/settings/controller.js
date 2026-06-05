@@ -29,7 +29,7 @@ exports.addBanner = addBanner;
 exports.deleteBanner = deleteBanner;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../../lib/prisma"));
-const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
+const JWT_SECRET = process.env.JWT_SECRET;
 function requireAdmin(req, res) {
     try {
         const token = req.cookies.token;

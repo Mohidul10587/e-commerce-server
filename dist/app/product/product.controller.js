@@ -61,10 +61,21 @@ function getProducts(req, res) {
             const skip = (parseInt(page) - 1) * parseInt(limit);
             const take = parseInt(limit);
             const [products, total] = yield Promise.all([
-                prisma_1.default.product.findMany({ where, include: productInclude, orderBy: { createdAt: "desc" }, skip, take }),
+                prisma_1.default.product.findMany({
+                    where,
+                    include: productInclude,
+                    orderBy: { createdAt: "desc" },
+                    skip,
+                    take,
+                }),
                 prisma_1.default.product.count({ where }),
             ]);
-            return res.json({ products, total, page: parseInt(page), limit: take });
+            return res.json({
+                products,
+                total,
+                page: parseInt(page),
+                limit: take,
+            });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });
@@ -123,15 +134,23 @@ function createProduct(req, res) {
         try {
             const parsed = product_validation_1.createProductSchema.safeParse(req.body);
             if (!parsed.success)
-                return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+                return res
+                    .status(400)
+                    .json({ message: "Validation error", errors: parsed.error.flatten() });
             const _a = parsed.data, { variants } = _a, productData = __rest(_a, ["variants"]);
-            const slugExists = yield prisma_1.default.product.findUnique({ where: { slug: productData.slug } });
+            const slugExists = yield prisma_1.default.product.findUnique({
+                where: { slug: productData.slug },
+            });
             if (slugExists)
                 return res.status(409).json({ message: "Slug already exists" });
             const skus = variants.map((v) => v.sku);
-            const duplicateSku = yield prisma_1.default.productVariant.findFirst({ where: { sku: { in: skus } } });
+            const duplicateSku = yield prisma_1.default.productVariant.findFirst({
+                where: { sku: { in: skus } },
+            });
             if (duplicateSku)
-                return res.status(409).json({ message: `SKU already exists: ${duplicateSku.sku}` });
+                return res
+                    .status(409)
+                    .json({ message: `SKU already exists: ${duplicateSku.sku}` });
             const product = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
                 var _a, _b;
                 const created = yield tx.product.create({
@@ -144,12 +163,20 @@ function createProduct(req, res) {
                 for (const variant of created.variants) {
                     if (variant.stock > 0) {
                         yield tx.stockHistory.create({
-                            data: { variantId: variant.id, action: "ADD", quantity: variant.stock, note: "Initial stock" },
+                            data: {
+                                variantId: variant.id,
+                                action: "ADD",
+                                quantity: variant.stock,
+                                note: "Initial stock",
+                            },
                         });
                     }
                 }
                 yield (0, product_service_1.syncProductStock)(created.id, tx);
-                return tx.product.findUniqueOrThrow({ where: { id: created.id }, include: productInclude });
+                return tx.product.findUniqueOrThrow({
+                    where: { id: created.id },
+                    include: productInclude,
+                });
             }));
             return res.status(201).json({ message: "Product created", product });
         }
@@ -164,25 +191,39 @@ function updateProduct(req, res) {
             const id = parseInt(req.params.id);
             const parsed = product_validation_1.updateProductSchema.safeParse(req.body);
             if (!parsed.success)
-                return res.status(400).json({ message: "Validation error", errors: parsed.error.flatten() });
+                return res
+                    .status(400)
+                    .json({ message: "Validation error", errors: parsed.error.flatten() });
             const _a = parsed.data, { variants } = _a, productData = __rest(_a, ["variants"]);
             if (productData.slug) {
-                const slugExists = yield prisma_1.default.product.findFirst({ where: { slug: productData.slug, NOT: { id } } });
+                const slugExists = yield prisma_1.default.product.findFirst({
+                    where: { slug: productData.slug, NOT: { id } },
+                });
                 if (slugExists)
                     return res.status(409).json({ message: "Slug already exists" });
             }
             const newVariantSkus = variants.filter((v) => !v.id).map((v) => v.sku);
             if (newVariantSkus.length > 0) {
-                const duplicateSku = yield prisma_1.default.productVariant.findFirst({ where: { sku: { in: newVariantSkus } } });
+                const duplicateSku = yield prisma_1.default.productVariant.findFirst({
+                    where: { sku: { in: newVariantSkus } },
+                });
                 if (duplicateSku)
-                    return res.status(409).json({ message: `SKU already exists: ${duplicateSku.sku}` });
+                    return res
+                        .status(409)
+                        .json({ message: `SKU already exists: ${duplicateSku.sku}` });
             }
             const product = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
                 var _a;
-                yield tx.product.update({ where: { id }, data: Object.assign(Object.assign({}, productData), { keywords: (_a = productData.keywords) !== null && _a !== void 0 ? _a : [] }) });
+                yield tx.product.update({
+                    where: { id },
+                    data: Object.assign(Object.assign({}, productData), { keywords: (_a = productData.keywords) !== null && _a !== void 0 ? _a : [] }),
+                });
                 yield (0, product_service_1.syncVariants)(id, variants, tx);
                 yield (0, product_service_1.syncProductStock)(id, tx);
-                return tx.product.findUniqueOrThrow({ where: { id }, include: productInclude });
+                return tx.product.findUniqueOrThrow({
+                    where: { id },
+                    include: productInclude,
+                });
             }));
             return res.json({ message: "Product updated", product });
         }
@@ -234,15 +275,27 @@ function updateVariantStock(req, res) {
             const variantId = parseInt(req.params.variantId);
             const { action, quantity, note } = req.body;
             if (!action || quantity === undefined)
-                return res.status(400).json({ message: "action and quantity are required" });
-            const validActions = ["ADD", "SALE", "REMOVE", "RETURN", "ADJUSTMENT"];
+                return res
+                    .status(400)
+                    .json({ message: "action and quantity are required" });
+            const validActions = [
+                "ADD",
+                "SALE",
+                "REMOVE",
+                "RETURN",
+                "ADJUSTMENT",
+            ];
             if (!validActions.includes(action))
-                return res.status(400).json({ message: `action must be one of: ${validActions.join(", ")}` });
+                return res
+                    .status(400)
+                    .json({ message: `action must be one of: ${validActions.join(", ")}` });
             if (quantity <= 0)
                 return res.status(400).json({ message: "quantity must be positive" });
             const newStock = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
                 const stock = yield (0, product_service_1.adjustStock)(variantId, action, quantity, note, tx);
-                const variant = yield tx.productVariant.findUniqueOrThrow({ where: { id: variantId } });
+                const variant = yield tx.productVariant.findUniqueOrThrow({
+                    where: { id: variantId },
+                });
                 yield (0, product_service_1.syncProductStock)(variant.productId, tx);
                 return stock;
             }));
@@ -259,7 +312,10 @@ function getStockHistory(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const variantId = parseInt(req.params.variantId);
-            const history = yield prisma_1.default.stockHistory.findMany({ where: { variantId }, orderBy: { createdAt: "desc" } });
+            const history = yield prisma_1.default.stockHistory.findMany({
+                where: { variantId },
+                orderBy: { createdAt: "desc" },
+            });
             return res.json({ history });
         }
         catch (error) {

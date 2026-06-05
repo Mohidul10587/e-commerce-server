@@ -37,7 +37,7 @@ app.use(body_parser_1.default.json());
 app.use(body_parser_1.default.urlencoded({ extended: true }));
 app.use((0, cookie_parser_1.default)());
 app.use((0, cors_1.default)({ origin: allowedOrigins, methods: ["GET", "POST", "PUT", "DELETE", "PATCH"], credentials: true }));
-app.get("/", (_req, res) => res.send("ডাক্তার ম্যানেজমেন্ট সার্ভার"));
+app.get("/", (_req, res) => res.send("Server is running"));
 app.use("/user", routes_1.userRoutes);
 app.use("/settings", routes_2.settingsRoutes);
 app.use("/products", product_routes_1.productRoutes);

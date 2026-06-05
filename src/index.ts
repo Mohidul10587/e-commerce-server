@@ -40,7 +40,7 @@ app.use(cookieParser());
 app.use(cors({ origin: allowedOrigins, methods: ["GET", "POST", "PUT", "DELETE", "PATCH"], credentials: true }));
 
 app.get("/", (_req: Request, res: Response) =>
-  res.send("ডাক্তার ম্যানেজমেন্ট সার্ভার")
+  res.send("Server is running")
 );
 
 app.use("/user", userRoutes);

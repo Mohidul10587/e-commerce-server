@@ -23,10 +23,13 @@ exports.updateUser = updateUser;
 exports.moveUserToTrash = moveUserToTrash;
 exports.restoreUser = restoreUser;
 exports.permanentDeleteUser = permanentDeleteUser;
+exports.changePassword = changePassword;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const prisma_1 = __importDefault(require("../../lib/prisma"));
-const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET)
+    throw new Error("JWT_SECRET env variable is required");
 const IS_PROD = process.env.NODE_ENV === "production";
 const COOKIE_OPTIONS = {
     httpOnly: true,
@@ -76,8 +79,8 @@ function login(req, res) {
             res.cookie("token", signToken(user), COOKIE_OPTIONS);
             return res.json({ message: "Login successful", user: safeUser(user) });
         }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
         }
     });
 }
@@ -87,6 +90,8 @@ function signup(req, res) {
             const { name, phone, password } = req.body;
             if (!name || !phone || !password)
                 return res.status(400).json({ message: "Name, phone and password required" });
+            if (password.length < 8)
+                return res.status(400).json({ message: "Password must be at least 8 characters" });
             const existing = yield prisma_1.default.user.findUnique({ where: { phone } });
             if (existing)
                 return res.status(409).json({ message: "Phone already registered" });
@@ -95,8 +100,8 @@ function signup(req, res) {
             res.cookie("token", signToken(user), COOKIE_OPTIONS);
             return res.status(201).json({ message: "Registration successful", user: safeUser(user) });
         }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
         }
     });
 }
@@ -179,8 +184,8 @@ function getUsers(req, res) {
             ]);
             return res.json({ users, total, page: parseInt(page), limit: take });
         }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
         }
     });
 }
@@ -199,8 +204,8 @@ function createUser(req, res) {
             const user = yield prisma_1.default.user.create({ data: { name, phone, password: hashed, role: role || "customer" } });
             return res.status(201).json({ message: "User created", user: safeUser(user) });
         }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
         }
     });
 }
@@ -223,8 +228,8 @@ function updateUser(req, res) {
             const user = yield prisma_1.default.user.update({ where: { id }, data });
             return res.json({ message: "User updated", user: safeUser(user) });
         }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
         }
     });
 }
@@ -237,8 +242,8 @@ function moveUserToTrash(req, res) {
             yield prisma_1.default.user.update({ where: { id }, data: { isTrashed: true } });
             return res.json({ message: "User moved to trash" });
         }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
         }
     });
 }
@@ -251,8 +256,8 @@ function restoreUser(req, res) {
             yield prisma_1.default.user.update({ where: { id }, data: { isTrashed: false } });
             return res.json({ message: "User restored" });
         }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
         }
     });
 }
@@ -265,8 +270,35 @@ function permanentDeleteUser(req, res) {
             yield prisma_1.default.user.delete({ where: { id } });
             return res.json({ message: "User permanently deleted" });
         }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
+        }
+    });
+}
+function changePassword(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const token = req.cookies.token;
+            if (!token)
+                return res.status(401).json({ message: "Unauthorized" });
+            const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+            const { currentPassword, newPassword } = req.body;
+            if (!currentPassword || !newPassword)
+                return res.status(400).json({ message: "Current and new password required" });
+            if (newPassword.length < 8)
+                return res.status(400).json({ message: "Password must be at least 8 characters" });
+            const user = yield prisma_1.default.user.findUnique({ where: { id: decoded.id } });
+            if (!user)
+                return res.status(404).json({ message: "User not found" });
+            const isMatch = yield bcrypt_1.default.compare(currentPassword, user.password);
+            if (!isMatch)
+                return res.status(401).json({ message: "Current password is incorrect" });
+            const hashed = yield bcrypt_1.default.hash(newPassword, 10);
+            yield prisma_1.default.user.update({ where: { id: decoded.id }, data: { password: hashed } });
+            return res.json({ message: "Password changed successfully" });
+        }
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
         }
     });
 }

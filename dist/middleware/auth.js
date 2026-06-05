@@ -15,7 +15,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.verifyAdmin = exports.verifyUserInactive = exports.verifyUser = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../lib/prisma"));
-const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET)
+    throw new Error("JWT_SECRET env variable is required");
 const IS_PROD = process.env.NODE_ENV === "production";
 const COOKIE_OPTIONS = {
     httpOnly: true,
