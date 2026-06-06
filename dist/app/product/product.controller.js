@@ -105,7 +105,15 @@ function getProductBySlug(req, res) {
             });
             if (!product || product.isTrashed)
                 return res.status(404).json({ message: "Product not found" });
-            return res.json({ product });
+            // Include free gift product if this is a seal product
+            let freeGiftProduct = null;
+            if (product.type === "seal") {
+                freeGiftProduct = yield prisma_1.default.product.findFirst({
+                    where: { isFreeGift: true, isTrashed: false },
+                    include: productInclude,
+                });
+            }
+            return res.json({ product, freeGiftProduct });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });
@@ -153,6 +161,12 @@ function createProduct(req, res) {
                     .json({ message: `SKU already exists: ${duplicateSku.sku}` });
             const product = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
                 var _a, _b;
+                // Enforce single free gift product
+                if (productData.isFreeGift) {
+                    const existing = yield tx.product.findFirst({ where: { isFreeGift: true, isTrashed: false } });
+                    if (existing)
+                        throw Object.assign(new Error(`"${existing.title}" is already marked as the free gift. Remove that tag first.`), { status: 409 });
+                }
                 const created = yield tx.product.create({
                     data: Object.assign(Object.assign({}, productData), { keywords: (_a = productData.keywords) !== null && _a !== void 0 ? _a : [], isFreeGift: (_b = productData.isFreeGift) !== null && _b !== void 0 ? _b : false, totalStock: 0, variants: { create: variants.map((_a) => {
                                 var { id: _id } = _a, v = __rest(_a, ["id"]);
@@ -181,6 +195,8 @@ function createProduct(req, res) {
             return res.status(201).json({ message: "Product created", product });
         }
         catch (error) {
+            if (error.status)
+                return res.status(error.status).json({ message: error.message });
             return res.status(500).json({ message: "Server error", error });
         }
     });
@@ -214,6 +230,12 @@ function updateProduct(req, res) {
             }
             const product = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
                 var _a;
+                // Enforce single free gift product (exclude self when editing)
+                if (productData.isFreeGift) {
+                    const existing = yield tx.product.findFirst({ where: { isFreeGift: true, isTrashed: false, NOT: { id } } });
+                    if (existing)
+                        throw Object.assign(new Error(`"${existing.title}" is already marked as the free gift. Remove that tag first.`), { status: 409 });
+                }
                 yield tx.product.update({
                     where: { id },
                     data: Object.assign(Object.assign({}, productData), { keywords: (_a = productData.keywords) !== null && _a !== void 0 ? _a : [] }),
@@ -228,6 +250,8 @@ function updateProduct(req, res) {
             return res.json({ message: "Product updated", product });
         }
         catch (error) {
+            if (error.status)
+                return res.status(error.status).json({ message: error.message });
             return res.status(500).json({ message: "Server error", error });
         }
     });

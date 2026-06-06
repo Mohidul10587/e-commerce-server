@@ -37,6 +37,11 @@ const COOKIE_OPTIONS = {
     sameSite: (IS_PROD ? "none" : "lax"),
     maxAge: 7 * 24 * 60 * 60 * 1000,
 };
+const CLEAR_COOKIE_OPTIONS = {
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: COOKIE_OPTIONS.sameSite,
+};
 function signToken(user) {
     return jsonwebtoken_1.default.sign({ id: user.id, phone: user.phone, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
 }
@@ -128,13 +133,13 @@ function refresh(req, res) {
             const token = req.cookies.token;
             // Missing token
             if (!token) {
-                res.clearCookie("token", COOKIE_OPTIONS);
+                res.clearCookie("token", CLEAR_COOKIE_OPTIONS);
                 return res.status(401).json({ success: false, message: "Session expired. Please login again.", logout: true });
             }
             const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
             const user = yield prisma_1.default.user.findUnique({ where: { id: decoded.id } });
             if (!user) {
-                res.clearCookie("token", COOKIE_OPTIONS);
+                res.clearCookie("token", CLEAR_COOKIE_OPTIONS);
                 return res.status(401).json({ success: false, message: "Session expired. Please login again.", logout: true });
             }
             res.cookie("token", signToken(user), COOKIE_OPTIONS);
@@ -142,14 +147,14 @@ function refresh(req, res) {
         }
         catch (_a) {
             // Expired, invalid, or malformed token
-            res.clearCookie("token", COOKIE_OPTIONS);
+            res.clearCookie("token", CLEAR_COOKIE_OPTIONS);
             return res.status(401).json({ success: false, message: "Session expired. Please login again.", logout: true });
         }
     });
 }
 function logout(_req, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        res.clearCookie("token", COOKIE_OPTIONS);
+        res.clearCookie("token", CLEAR_COOKIE_OPTIONS);
         return res.json({ message: "Logged out" });
     });
 }
