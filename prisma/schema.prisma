@@ -185,13 +185,45 @@ model OrderItem {
 }
 
 model Supplier {
-  id        Int      @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   name      String
   address   String?
   phone     String?
   website   String?
   facebook  String?
-  isTrashed Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isTrashed Boolean    @default(false)
+  purchases Purchase[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+enum PurchaseStatus {
+  Pending
+  Ordered
+  Received
+}
+
+model Purchase {
+  id          Int            @id @default(autoincrement())
+  supplierId  Int?
+  supplier    Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  date        DateTime
+  status      PurchaseStatus @default(Pending)
+  totalAmount Float
+  note        String?
+  stockUpdated Boolean       @default(false)
+  items       PurchaseItem[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model PurchaseItem {
+  id            Int      @id @default(autoincrement())
+  purchaseId    Int
+  purchase      Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  variantId     Int
+  variantTitle  String
+  productTitle  String
+  quantity      Int
+  purchasePrice Float
 }

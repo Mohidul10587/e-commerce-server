@@ -11,6 +11,7 @@ import { settingsRoutes } from "./app/settings/routes";
 import { productRoutes } from "./app/product/product.routes";
 import { orderRoutes } from "./app/order/order.routes";
 import { supplierRoutes } from "./app/supplier/supplier.routes";
+import { purchaseRoutes } from "./app/purchase/purchase.routes";
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.use("/settings", settingsRoutes);
 app.use("/products", productRoutes);
 app.use("/orders", orderRoutes);
 app.use("/suppliers", supplierRoutes);
+app.use("/purchases", purchaseRoutes);
 
 app.use(errorHandler);
 
