@@ -12,6 +12,7 @@ import { productRoutes } from "./app/product/product.routes";
 import { orderRoutes } from "./app/order/order.routes";
 import { supplierRoutes } from "./app/supplier/supplier.routes";
 import { purchaseRoutes } from "./app/purchase/purchase.routes";
+import { inventoryRoutes } from "./app/inventory/inventory.routes";
 
 dotenv.config();
 
@@ -51,6 +52,7 @@ app.use("/products", productRoutes);
 app.use("/orders", orderRoutes);
 app.use("/suppliers", supplierRoutes);
 app.use("/purchases", purchaseRoutes);
+app.use("/inventory", inventoryRoutes);
 
 app.use(errorHandler);
 
