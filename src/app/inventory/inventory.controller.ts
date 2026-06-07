@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import prisma from "../../lib/prisma";
 
 const LOW_STOCK_THRESHOLD = 5;
-hello;
+
 export async function getInventoryStats(_req: Request, res: Response) {
   try {
     const now = new Date();
