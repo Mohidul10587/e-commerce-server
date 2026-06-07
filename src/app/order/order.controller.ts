@@ -329,17 +329,6 @@ export const updateOrder = async (req: Request, res: Response) => {
     const newTotal = subtotal + deliveryCharge - (disc ?? 0);
     data.total = newTotal;
 
-    if (
-      paidAmount !== undefined &&
-      !isNaN(Number(paidAmount)) &&
-      Number(paidAmount) >= 0
-    ) {
-      const paid = Number(paidAmount);
-      data.paidAmount = paid;
-      data.paymentStatus =
-        paid <= 0 ? "unpaid" : paid >= newTotal ? "paid" : "partial";
-    }
-
     const order = await prisma.order.update({
       where: { id },
       data,
@@ -634,31 +623,30 @@ export const updateOrderDiscount = async (req: Request, res: Response) => {
 export const updateOrderPayment = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const { paidAmount } = req.body;
+    const { amount, note } = req.body;
 
-    if (
-      paidAmount === undefined ||
-      isNaN(Number(paidAmount)) ||
-      Number(paidAmount) < 0
-    )
-      return res.status(400).json({ message: "Valid paidAmount is required" });
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0)
+      return res.status(400).json({ message: "Valid amount is required" });
 
-    const paid = Number(paidAmount);
-
-    // Fetch total to compute paymentStatus
     const existing = await prisma.order.findUnique({
       where: { id },
-      select: { total: true },
+      select: { total: true, paidAmount: true },
     });
     if (!existing) return res.status(404).json({ message: "Order not found" });
 
+    const newPaid = existing.paidAmount + Number(amount);
     const paymentStatus =
-      paid <= 0 ? "unpaid" : paid >= existing.total ? "paid" : "partial";
+      newPaid >= existing.total ? "paid" : "partial";
 
-    const order = await prisma.order.update({
-      where: { id },
-      data: { paidAmount: paid, paymentStatus },
-      include: { items: true },
+    const order = await prisma.$transaction(async (tx) => {
+      await tx.paymentTransaction.create({
+        data: { orderId: id, amount: Number(amount), note: note || null },
+      });
+      return tx.order.update({
+        where: { id },
+        data: { paidAmount: newPaid, paymentStatus, paidAt: new Date() },
+        include: { items: true, transactions: { orderBy: { createdAt: "asc" } } },
+      });
     });
 
     io.emit("order:updated", order);

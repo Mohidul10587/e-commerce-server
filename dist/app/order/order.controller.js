@@ -294,6 +294,7 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             data.paidAmount = paid;
             data.paymentStatus =
                 paid <= 0 ? "unpaid" : paid >= newTotal ? "paid" : "partial";
+            data.paidAt = paid > 0 ? new Date() : null;
         }
         const order = yield prisma_1.prisma.order.update({
             where: { id },
@@ -601,7 +602,11 @@ const updateOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, funct
         const paymentStatus = paid <= 0 ? "unpaid" : paid >= existing.total ? "paid" : "partial";
         const order = yield prisma_1.prisma.order.update({
             where: { id },
-            data: { paidAmount: paid, paymentStatus },
+            data: {
+                paidAmount: paid,
+                paymentStatus,
+                paidAt: paid > 0 ? new Date() : null,
+            },
             include: { items: true },
         });
         index_1.io.emit("order:updated", order);

@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.inventoryRoutes = void 0;
+const express_1 = require("express");
+const inventory_controller_1 = require("./inventory.controller");
+const auth_1 = require("../../middleware/auth");
+const router = (0, express_1.Router)();
+exports.inventoryRoutes = router;
+router.get("/stats", auth_1.verifyAdmin, inventory_controller_1.getInventoryStats);
+router.get("/stock", auth_1.verifyAdmin, inventory_controller_1.getStockList);
+router.get("/chart", auth_1.verifyAdmin, inventory_controller_1.getMonthlyChartData);
+router.patch("/variant/:id", auth_1.verifyAdmin, inventory_controller_1.updateVariantInline);
