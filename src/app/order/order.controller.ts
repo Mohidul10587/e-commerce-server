@@ -625,7 +625,7 @@ export const updateOrderDiscount = async (req: Request, res: Response) => {
 export const updateOrderPayment = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
-    const { amount, note } = req.body;
+    const { amount, note, source, trxId } = req.body;
 
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0)
       return res.status(400).json({ message: "Valid amount is required" });
@@ -642,7 +642,7 @@ export const updateOrderPayment = async (req: Request, res: Response) => {
 
     const order = await prisma.$transaction(async (tx) => {
       await tx.paymentTransaction.create({
-        data: { orderId: id, amount: Number(amount), note: note || null },
+        data: { orderId: id, amount: Number(amount), note: note || null, source: source || null, trxId: trxId || null },
       });
       return tx.order.update({
         where: { id },

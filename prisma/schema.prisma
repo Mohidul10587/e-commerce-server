@@ -179,6 +179,8 @@ model PaymentTransaction {
   orderId   Int
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   amount    Float
+  source    String?
+  trxId     String?
   note      String?
   createdAt DateTime @default(now())
 }
