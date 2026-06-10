@@ -62,6 +62,7 @@ export const createOrder = async (req: Request, res: Response) => {
       note,
       discount,
       discountPercent,
+      status,
     } = req.body;
 
     if (!customerName || !customerPhone || !address || !items?.length)
@@ -118,6 +119,7 @@ export const createOrder = async (req: Request, res: Response) => {
         total: subtotal + charge - disc,
         discount: disc,
         discountPercent: discPct,
+        status: status || undefined,
         note: note || null,
         items: { create: resolvedItems },
       },
