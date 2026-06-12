@@ -8,6 +8,20 @@ const productInclude = {
   variants: {
     where: { isActive: true },
     orderBy: { isDefault: "desc" as const },
+    select: {
+      id: true,
+      title: true,
+      size: true,
+      color: true,
+      regularPrice: true,
+      salePrice: true,
+      purchasePrice: true,
+      stock: true,
+      sku: true,
+      images: true,
+      isDefault: true,
+      isActive: true,
+    },
   },
 };
 

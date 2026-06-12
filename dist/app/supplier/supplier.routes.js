@@ -9,6 +9,7 @@ exports.supplierRoutes = router;
 router.get("/", auth_1.verifyAdmin, supplier_controller_1.getSuppliers);
 router.post("/", auth_1.verifyAdmin, supplier_controller_1.createSupplier);
 router.put("/:id", auth_1.verifyAdmin, supplier_controller_1.updateSupplier);
+router.delete("/trash/empty", auth_1.verifyAdmin, supplier_controller_1.emptySupplierTrash);
 router.delete("/:id", auth_1.verifyAdmin, supplier_controller_1.trashSupplier);
 router.patch("/:id/restore", auth_1.verifyAdmin, supplier_controller_1.restoreSupplier);
 router.delete("/:id/permanent", auth_1.verifyAdmin, supplier_controller_1.deleteSupplier);

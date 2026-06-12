@@ -24,6 +24,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getProducts = getProducts;
+exports.getInkProducts = getInkProducts;
 exports.getFreeGiftProduct = getFreeGiftProduct;
 exports.getProductBySlug = getProductBySlug;
 exports.getProductById = getProductById;
@@ -32,6 +33,7 @@ exports.updateProduct = updateProduct;
 exports.moveToTrash = moveToTrash;
 exports.restoreFromTrash = restoreFromTrash;
 exports.permanentDeleteProduct = permanentDeleteProduct;
+exports.emptyProductTrash = emptyProductTrash;
 exports.updateVariantStock = updateVariantStock;
 exports.getStockHistory = getStockHistory;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
@@ -41,6 +43,20 @@ const productInclude = {
     variants: {
         where: { isActive: true },
         orderBy: { isDefault: "desc" },
+        select: {
+            id: true,
+            title: true,
+            size: true,
+            color: true,
+            regularPrice: true,
+            salePrice: true,
+            purchasePrice: true,
+            stock: true,
+            sku: true,
+            images: true,
+            isDefault: true,
+            isActive: true,
+        },
     },
 };
 function getProducts(req, res) {
@@ -76,6 +92,21 @@ function getProducts(req, res) {
                 page: parseInt(page),
                 limit: take,
             });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function getInkProducts(_req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const products = yield prisma_1.default.product.findMany({
+                where: { type: "ink", isTrashed: false },
+                include: productInclude,
+                orderBy: { createdAt: "desc" },
+            });
+            return res.json({ products });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });
@@ -286,6 +317,17 @@ function permanentDeleteProduct(req, res) {
             const id = parseInt(req.params.id);
             yield prisma_1.default.product.delete({ where: { id } });
             return res.json({ message: "Product permanently deleted" });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function emptyProductTrash(_req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { count } = yield prisma_1.default.product.deleteMany({ where: { isTrashed: true } });
+            return res.json({ message: `${count} products permanently deleted` });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });

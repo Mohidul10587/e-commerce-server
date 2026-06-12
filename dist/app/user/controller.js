@@ -23,6 +23,7 @@ exports.updateUser = updateUser;
 exports.moveUserToTrash = moveUserToTrash;
 exports.restoreUser = restoreUser;
 exports.permanentDeleteUser = permanentDeleteUser;
+exports.emptyUserTrash = emptyUserTrash;
 exports.changePassword = changePassword;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
@@ -274,6 +275,17 @@ function permanentDeleteUser(req, res) {
             const id = parseInt(req.params.id);
             yield prisma_1.default.user.delete({ where: { id } });
             return res.json({ message: "User permanently deleted" });
+        }
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
+        }
+    });
+}
+function emptyUserTrash(_req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { count } = yield prisma_1.default.user.deleteMany({ where: { isTrashed: true } });
+            return res.json({ message: `${count} users permanently deleted` });
         }
         catch (_a) {
             return res.status(500).json({ message: "Server error" });

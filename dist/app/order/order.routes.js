@@ -25,6 +25,7 @@ exports.orderRoutes.patch("/:id/payment", order_controller_1.updateOrderPayment)
 exports.orderRoutes.patch("/:id/discount", order_controller_1.updateOrderDiscount);
 exports.orderRoutes.post("/:id/items", order_controller_1.addOrderItem);
 exports.orderRoutes.put("/:id", order_controller_1.updateOrder);
+exports.orderRoutes.delete("/trash/empty", order_controller_1.emptyOrderTrash);
 exports.orderRoutes.delete("/:id", order_controller_1.moveOrderToTrash);
 exports.orderRoutes.patch("/:id/restore", order_controller_1.restoreOrder);
 exports.orderRoutes.delete("/:id/permanent", order_controller_1.permanentDeleteOrder);

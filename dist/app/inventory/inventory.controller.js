@@ -286,29 +286,33 @@ function getStockMovementByDateRange(req, res) {
                 return res.status(400).json({ message: "startDate and endDate are required" });
             const start = new Date(`${startDate}T00:00:00.000Z`);
             const end = new Date(`${endDate}T23:59:59.999Z`);
-            // Stock OUT: confirmed orders in range (by confirmedAt)
-            const confirmedOrders = yield prisma_1.default.order.findMany({
-                where: {
-                    isTrashed: false,
-                    confirmedAt: { gte: start, lte: end },
-                },
-                select: { items: { select: { quantity: true } } },
-            });
-            const stockOut = confirmedOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.quantity, 0), 0);
-            // Stock IN + purchase amount: received purchases in range (by receivedAt)
-            const receivedPurchases = yield prisma_1.default.purchase.findMany({
-                where: {
-                    isTrashed: false,
-                    status: "Received",
-                    receivedAt: { gte: start, lte: end },
-                },
-                select: {
-                    totalAmount: true,
-                    items: { select: { quantity: true } },
-                },
-            });
+            const [history, orderedPurchases, receivedPurchases] = yield Promise.all([
+                prisma_1.default.stockHistory.findMany({
+                    where: { createdAt: { gte: start, lte: end } },
+                    select: { action: true, quantity: true },
+                }),
+                prisma_1.default.purchase.findMany({
+                    where: {
+                        isTrashed: false,
+                        status: "Ordered",
+                        date: { gte: start, lte: end },
+                    },
+                    select: { purchaseMoney: true, items: { select: { quantity: true } } },
+                }),
+                prisma_1.default.purchase.findMany({
+                    where: {
+                        isTrashed: false,
+                        status: "Received",
+                        receivedAt: { gte: start, lte: end },
+                    },
+                    select: { purchaseMoney: true, items: { select: { quantity: true } } },
+                }),
+            ]);
+            const stockOut = history
+                .filter((h) => h.action === "SALE" || h.action === "REMOVE")
+                .reduce((sum, h) => sum + h.quantity, 0);
             const stockIn = receivedPurchases.reduce((sum, p) => sum + p.items.reduce((s, i) => s + i.quantity, 0), 0);
-            const purchaseAmount = receivedPurchases.reduce((sum, p) => sum + p.totalAmount, 0);
+            const purchaseAmount = [...orderedPurchases, ...receivedPurchases].reduce((sum, p) => { var _a; return sum + ((_a = p.purchaseMoney) !== null && _a !== void 0 ? _a : 0); }, 0);
             return res.json({ stockIn, stockOut, purchaseAmount });
         }
         catch (error) {

@@ -18,6 +18,7 @@ exports.updateSupplier = updateSupplier;
 exports.trashSupplier = trashSupplier;
 exports.restoreSupplier = restoreSupplier;
 exports.deleteSupplier = deleteSupplier;
+exports.emptySupplierTrash = emptySupplierTrash;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
 function getSuppliers(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -115,6 +116,17 @@ function deleteSupplier(req, res) {
         try {
             yield prisma_1.default.supplier.delete({ where: { id: parseInt(req.params.id) } });
             return res.json({ message: "Deleted" });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function emptySupplierTrash(_req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { count } = yield prisma_1.default.supplier.deleteMany({ where: { isTrashed: true } });
+            return res.json({ message: `${count} suppliers permanently deleted` });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });
