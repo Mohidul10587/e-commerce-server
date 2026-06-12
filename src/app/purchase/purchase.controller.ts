@@ -107,6 +107,68 @@ export async function createPurchase(req: Request, res: Response) {
   }
 }
 
+export async function updatePurchase(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    const { supplierId, date, status, note, items } = req.body;
+
+    if (!items?.length) return res.status(400).json({ message: "At least one item is required" });
+
+    const existing = await prisma.purchase.findUniqueOrThrow({ where: { id }, include: { items: true } });
+
+    const totalAmount = items.reduce(
+      (sum: number, i: any) => sum + i.quantity * i.purchasePrice,
+      0
+    );
+
+    const purchase = await prisma.$transaction(async (tx) => {
+      // Delete old items and recreate
+      await tx.purchaseItem.deleteMany({ where: { purchaseId: id } });
+
+      // Handle stock transitions
+      const wasReceived = existing.stockUpdated;
+      const nowReceived = status === "Received";
+
+      if (wasReceived && !nowReceived) {
+        // Reverse old stock
+        for (const item of existing.items) {
+          const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true, stock: true } });
+          if (!variant) continue;
+          await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: Math.max(0, variant.stock - item.quantity) } });
+          await tx.stockHistory.create({ data: { variantId: item.variantId, action: "REMOVE", quantity: item.quantity, note: `Purchase #${id} edit un-received` } });
+          await syncProductStock(variant.productId, tx as any);
+        }
+      }
+
+      const updated = await tx.purchase.update({
+        where: { id },
+        data: {
+          supplierId: supplierId || null,
+          date: new Date(date),
+          status,
+          note,
+          totalAmount,
+          stockUpdated: nowReceived,
+          receivedAt: nowReceived ? (existing.receivedAt ?? new Date()) : null,
+          items: { create: items.map((i: any) => ({ variantId: i.variantId, variantTitle: i.variantTitle, productTitle: i.productTitle, quantity: i.quantity, purchasePrice: i.purchasePrice })) },
+        },
+        include: { items: true },
+      });
+
+      if (!wasReceived && nowReceived) {
+        await applyStockForPurchase(updated.items, id, tx);
+        await tx.purchase.update({ where: { id }, data: { stockUpdated: true, receivedAt: new Date() } });
+      }
+
+      return updated;
+    });
+
+    return res.json({ purchase });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
 export async function updatePurchaseStatus(req: Request, res: Response) {
   try {
     const id = parseInt(req.params.id);
