@@ -322,7 +322,7 @@ export async function getStockMovementByDateRange(req: Request, res: Response) {
           status: "Ordered",
           date: { gte: start, lte: end },
         },
-        select: { totalAmount: true, items: { select: { quantity: true } } },
+        select: { purchaseMoney: true, items: { select: { quantity: true } } },
       }),
       prisma.purchase.findMany({
         where: {
@@ -330,7 +330,7 @@ export async function getStockMovementByDateRange(req: Request, res: Response) {
           status: "Received",
           receivedAt: { gte: start, lte: end },
         },
-        select: { totalAmount: true, items: { select: { quantity: true } } },
+        select: { purchaseMoney: true, items: { select: { quantity: true } } },
       }),
     ]);
 
@@ -343,7 +343,7 @@ export async function getStockMovementByDateRange(req: Request, res: Response) {
       0
     );
     const purchaseAmount = [...orderedPurchases, ...receivedPurchases].reduce(
-      (sum, p) => sum + p.totalAmount,
+      (sum, p) => sum + (p.purchaseMoney ?? 0),
       0
     );
 

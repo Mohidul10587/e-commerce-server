@@ -44,7 +44,17 @@ export async function getPurchases(req: Request, res: Response) {
     const [purchases, total] = await Promise.all([
       prisma.purchase.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          supplierId: true,
+          date: true,
+          status: true,
+          totalAmount: true,
+          purchaseMoney: true,
+          orderedAt: true,
+          note: true,
+          stockUpdated: true,
+          isTrashed: true,
           supplier: { select: { id: true, name: true } },
           items: true,
         },
@@ -63,7 +73,7 @@ export async function getPurchases(req: Request, res: Response) {
 
 export async function createPurchase(req: Request, res: Response) {
   try {
-    const { supplierId, date, status, note, items } = req.body;
+    const { supplierId, date, status, note, purchaseMoney, items } = req.body;
 
     if (!items?.length) return res.status(400).json({ message: "At least one item is required" });
 
@@ -80,6 +90,8 @@ export async function createPurchase(req: Request, res: Response) {
           status,
           note,
           totalAmount,
+          purchaseMoney: purchaseMoney || null,
+          orderedAt: purchaseMoney ? new Date() : null,
           items: {
             create: items.map((i: any) => ({
               variantId: i.variantId,
@@ -110,7 +122,7 @@ export async function createPurchase(req: Request, res: Response) {
 export async function updatePurchase(req: Request, res: Response) {
   try {
     const id = parseInt(req.params.id);
-    const { supplierId, date, status, note, items } = req.body;
+    const { supplierId, date, status, note, purchaseMoney, items } = req.body;
 
     if (!items?.length) return res.status(400).json({ message: "At least one item is required" });
 
@@ -148,6 +160,8 @@ export async function updatePurchase(req: Request, res: Response) {
           status,
           note,
           totalAmount,
+          purchaseMoney: purchaseMoney !== undefined ? purchaseMoney : existing.purchaseMoney,
+          orderedAt: purchaseMoney && !existing.purchaseMoney ? new Date() : existing.orderedAt,
           stockUpdated: nowReceived,
           receivedAt: nowReceived ? (existing.receivedAt ?? new Date()) : null,
           items: { create: items.map((i: any) => ({ variantId: i.variantId, variantTitle: i.variantTitle, productTitle: i.productTitle, quantity: i.quantity, purchasePrice: i.purchasePrice })) },
@@ -172,7 +186,7 @@ export async function updatePurchase(req: Request, res: Response) {
 export async function updatePurchaseStatus(req: Request, res: Response) {
   try {
     const id = parseInt(req.params.id);
-    const { status } = req.body;
+    const { status, purchaseMoney } = req.body;
 
     const existing = await prisma.purchase.findUniqueOrThrow({
       where: { id },
@@ -180,14 +194,28 @@ export async function updatePurchaseStatus(req: Request, res: Response) {
     });
 
     const updated = await prisma.$transaction(async (tx) => {
+      // If purchaseMoney is provided, set status to Ordered and record orderedAt
+      if (purchaseMoney !== undefined && purchaseMoney !== null) {
+        await tx.purchase.update({
+          where: { id },
+          data: {
+            purchaseMoney: parseFloat(purchaseMoney),
+            status: "Ordered",
+            orderedAt: existing.orderedAt ?? new Date(),
+          },
+        });
+      }
+
+      const targetStatus = purchaseMoney !== undefined && purchaseMoney !== null ? "Ordered" : status;
+
       // Pending/Ordered → Received: add stock
-      if (status === "Received" && !existing.stockUpdated) {
+      if (targetStatus === "Received" && !existing.stockUpdated) {
         await applyStockForPurchase(existing.items, id, tx);
         await tx.purchase.update({ where: { id }, data: { stockUpdated: true, receivedAt: new Date() } });
       }
 
       // Received → Pending/Ordered: reverse stock
-      if (existing.stockUpdated && status !== "Received") {
+      if (existing.stockUpdated && targetStatus !== "Received") {
         for (const item of existing.items) {
           const variant = await tx.productVariant.findUnique({
             where: { id: item.variantId },
@@ -207,7 +235,7 @@ export async function updatePurchaseStatus(req: Request, res: Response) {
         await tx.purchase.update({ where: { id }, data: { stockUpdated: false, receivedAt: null } });
       }
 
-      return tx.purchase.update({ where: { id }, data: { status } });
+      return tx.purchase.update({ where: { id }, data: { status: targetStatus } });
     });
 
     return res.json({ purchase: updated });

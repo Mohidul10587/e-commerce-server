@@ -221,19 +221,21 @@ enum PurchaseStatus {
 }
 
 model Purchase {
-  id          Int            @id @default(autoincrement())
-  supplierId  Int?
-  supplier    Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  date        DateTime
-  status      PurchaseStatus @default(Pending)
-  totalAmount Float
-  note        String?
-  stockUpdated Boolean       @default(false)
-  receivedAt  DateTime?
-  isTrashed   Boolean        @default(false)
-  items       PurchaseItem[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id            Int            @id @default(autoincrement())
+  supplierId    Int?
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  date          DateTime
+  status        PurchaseStatus @default(Pending)
+  totalAmount   Float
+  purchaseMoney Float?
+  orderedAt     DateTime?
+  note          String?
+  stockUpdated  Boolean        @default(false)
+  receivedAt    DateTime?
+  isTrashed     Boolean        @default(false)
+  items         PurchaseItem[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model PurchaseItem {
