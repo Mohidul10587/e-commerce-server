@@ -16,6 +16,7 @@ exports.getInventoryStats = getInventoryStats;
 exports.getStockList = getStockList;
 exports.updateVariantInline = updateVariantInline;
 exports.getMonthlyChartData = getMonthlyChartData;
+exports.getStockMovementByDateRange = getStockMovementByDateRange;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
 const LOW_STOCK_THRESHOLD = 5;
 function getInventoryStats(_req, res) {
@@ -271,6 +272,44 @@ function getMonthlyChartData(_req, res) {
                 });
             }
             return res.json({ months });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function getStockMovementByDateRange(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { startDate, endDate } = req.query;
+            if (!startDate || !endDate)
+                return res.status(400).json({ message: "startDate and endDate are required" });
+            const start = new Date(`${startDate}T00:00:00.000Z`);
+            const end = new Date(`${endDate}T23:59:59.999Z`);
+            // Stock OUT: confirmed orders in range (by confirmedAt)
+            const confirmedOrders = yield prisma_1.default.order.findMany({
+                where: {
+                    isTrashed: false,
+                    confirmedAt: { gte: start, lte: end },
+                },
+                select: { items: { select: { quantity: true } } },
+            });
+            const stockOut = confirmedOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.quantity, 0), 0);
+            // Stock IN + purchase amount: received purchases in range (by receivedAt)
+            const receivedPurchases = yield prisma_1.default.purchase.findMany({
+                where: {
+                    isTrashed: false,
+                    status: "Received",
+                    receivedAt: { gte: start, lte: end },
+                },
+                select: {
+                    totalAmount: true,
+                    items: { select: { quantity: true } },
+                },
+            });
+            const stockIn = receivedPurchases.reduce((sum, p) => sum + p.items.reduce((s, i) => s + i.quantity, 0), 0);
+            const purchaseAmount = receivedPurchases.reduce((sum, p) => sum + p.totalAmount, 0);
+            return res.json({ stockIn, stockOut, purchaseAmount });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });

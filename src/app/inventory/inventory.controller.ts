@@ -301,3 +301,54 @@ export async function getMonthlyChartData(_req: Request, res: Response) {
     return res.status(500).json({ message: "Server error", error });
   }
 }
+
+export async function getStockMovementByDateRange(req: Request, res: Response) {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate)
+      return res.status(400).json({ message: "startDate and endDate are required" });
+
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    const end = new Date(`${endDate}T23:59:59.999Z`);
+
+    const [history, orderedPurchases, receivedPurchases] = await Promise.all([
+      prisma.stockHistory.findMany({
+        where: { createdAt: { gte: start, lte: end } },
+        select: { action: true, quantity: true },
+      }),
+      prisma.purchase.findMany({
+        where: {
+          isTrashed: false,
+          status: "Ordered",
+          date: { gte: start, lte: end },
+        },
+        select: { totalAmount: true, items: { select: { quantity: true } } },
+      }),
+      prisma.purchase.findMany({
+        where: {
+          isTrashed: false,
+          status: "Received",
+          receivedAt: { gte: start, lte: end },
+        },
+        select: { totalAmount: true, items: { select: { quantity: true } } },
+      }),
+    ]);
+
+    const stockOut = history
+      .filter((h) => h.action === "SALE" || h.action === "REMOVE")
+      .reduce((sum, h) => sum + h.quantity, 0);
+
+    const stockIn = receivedPurchases.reduce(
+      (sum, p) => sum + p.items.reduce((s, i) => s + i.quantity, 0),
+      0
+    );
+    const purchaseAmount = [...orderedPurchases, ...receivedPurchases].reduce(
+      (sum, p) => sum + p.totalAmount,
+      0
+    );
+
+    return res.json({ stockIn, stockOut, purchaseAmount });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}

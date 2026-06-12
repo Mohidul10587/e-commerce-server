@@ -225,7 +225,11 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 }
                 yield tx.order.update({ where: { id }, data: { stockDeducted: false } });
             }
-            yield tx.order.update({ where: { id }, data: { status } });
+            const extraData = { status };
+            if (status === "OrderConfirmed" && !existing.confirmedAt) {
+                extraData.confirmedAt = new Date();
+            }
+            yield tx.order.update({ where: { id }, data: extraData });
         }));
         const order = yield prisma_1.prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
         index_1.io.emit("order:updated", order);

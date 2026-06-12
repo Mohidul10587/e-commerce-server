@@ -95,7 +95,7 @@ export async function createPurchase(req: Request, res: Response) {
 
       if (status === "Received") {
         await applyStockForPurchase(created.items, created.id, tx);
-        await tx.purchase.update({ where: { id: created.id }, data: { stockUpdated: true } });
+        await tx.purchase.update({ where: { id: created.id }, data: { stockUpdated: true, receivedAt: new Date() } });
       }
 
       return created;
@@ -121,7 +121,7 @@ export async function updatePurchaseStatus(req: Request, res: Response) {
       // Pending/Ordered → Received: add stock
       if (status === "Received" && !existing.stockUpdated) {
         await applyStockForPurchase(existing.items, id, tx);
-        await tx.purchase.update({ where: { id }, data: { stockUpdated: true } });
+        await tx.purchase.update({ where: { id }, data: { stockUpdated: true, receivedAt: new Date() } });
       }
 
       // Received → Pending/Ordered: reverse stock
@@ -142,7 +142,7 @@ export async function updatePurchaseStatus(req: Request, res: Response) {
           });
           await syncProductStock(variant.productId, tx as any);
         }
-        await tx.purchase.update({ where: { id }, data: { stockUpdated: false } });
+        await tx.purchase.update({ where: { id }, data: { stockUpdated: false, receivedAt: null } });
       }
 
       return tx.purchase.update({ where: { id }, data: { status } });
@@ -179,6 +179,15 @@ export async function deletePurchase(req: Request, res: Response) {
     const id = parseInt(req.params.id);
     await prisma.purchase.delete({ where: { id } });
     return res.json({ message: "Permanently deleted" });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
+export async function emptyPurchaseTrash(_req: Request, res: Response) {
+  try {
+    const { count } = await prisma.purchase.deleteMany({ where: { isTrashed: true } });
+    return res.json({ message: `${count} purchases permanently deleted` });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }

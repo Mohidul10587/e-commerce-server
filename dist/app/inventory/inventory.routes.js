@@ -9,4 +9,5 @@ exports.inventoryRoutes = router;
 router.get("/stats", auth_1.verifyAdmin, inventory_controller_1.getInventoryStats);
 router.get("/stock", auth_1.verifyAdmin, inventory_controller_1.getStockList);
 router.get("/chart", auth_1.verifyAdmin, inventory_controller_1.getMonthlyChartData);
+router.get("/movement", auth_1.verifyAdmin, inventory_controller_1.getStockMovementByDateRange);
 router.patch("/variant/:id", auth_1.verifyAdmin, inventory_controller_1.updateVariantInline);

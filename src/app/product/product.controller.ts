@@ -50,6 +50,19 @@ export async function getProducts(req: Request, res: Response) {
   }
 }
 
+export async function getInkProducts(_req: Request, res: Response) {
+  try {
+    const products = await prisma.product.findMany({
+      where: { type: "ink", isTrashed: false },
+      include: productInclude,
+      orderBy: { createdAt: "desc" },
+    });
+    return res.json({ products });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
 export async function getFreeGiftProduct(_req: Request, res: Response) {
   try {
     const product = await prisma.product.findFirst({
@@ -253,6 +266,15 @@ export async function permanentDeleteProduct(req: Request, res: Response) {
     const id = parseInt(req.params.id);
     await prisma.product.delete({ where: { id } });
     return res.json({ message: "Product permanently deleted" });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
+export async function emptyProductTrash(_req: Request, res: Response) {
+  try {
+    const { count } = await prisma.product.deleteMany({ where: { isTrashed: true } });
+    return res.json({ message: `${count} products permanently deleted` });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }

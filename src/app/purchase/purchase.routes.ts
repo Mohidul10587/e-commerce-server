@@ -1,11 +1,7 @@
 import { Router } from "express";
 import {
-  getPurchases,
-  createPurchase,
-  updatePurchaseStatus,
-  movePurchaseToTrash,
-  restorePurchase,
-  deletePurchase,
+  getPurchases, createPurchase, updatePurchaseStatus,
+  movePurchaseToTrash, restorePurchase, deletePurchase, emptyPurchaseTrash,
 } from "./purchase.controller";
 import { verifyAdmin } from "../../middleware/auth";
 
@@ -15,6 +11,7 @@ router.get("/", verifyAdmin, getPurchases);
 router.post("/", verifyAdmin, createPurchase);
 router.patch("/:id/status", verifyAdmin, updatePurchaseStatus);
 router.patch("/:id/restore", verifyAdmin, restorePurchase);
+router.delete("/trash/empty", verifyAdmin, emptyPurchaseTrash);
 router.delete("/:id", verifyAdmin, movePurchaseToTrash);
 router.delete("/:id/permanent", verifyAdmin, deletePurchase);
 

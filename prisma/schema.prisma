@@ -168,6 +168,7 @@ model Order {
   paidAmount      Float         @default(0)
   paymentStatus   PaymentStatus @default(unpaid)
   paidAt          DateTime?
+  confirmedAt     DateTime?
   isTrashed       Boolean       @default(false)
   stockDeducted   Boolean       @default(false)
   note            String?
@@ -228,6 +229,7 @@ model Purchase {
   totalAmount Float
   note        String?
   stockUpdated Boolean       @default(false)
+  receivedAt  DateTime?
   isTrashed   Boolean        @default(false)
   items       PurchaseItem[]
   createdAt   DateTime       @default(now())

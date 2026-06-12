@@ -103,7 +103,7 @@ function createPurchase(req, res) {
                 });
                 if (status === "Received") {
                     yield applyStockForPurchase(created.items, created.id, tx);
-                    yield tx.purchase.update({ where: { id: created.id }, data: { stockUpdated: true } });
+                    yield tx.purchase.update({ where: { id: created.id }, data: { stockUpdated: true, receivedAt: new Date() } });
                 }
                 return created;
             }));
@@ -127,7 +127,7 @@ function updatePurchaseStatus(req, res) {
                 // Pending/Ordered → Received: add stock
                 if (status === "Received" && !existing.stockUpdated) {
                     yield applyStockForPurchase(existing.items, id, tx);
-                    yield tx.purchase.update({ where: { id }, data: { stockUpdated: true } });
+                    yield tx.purchase.update({ where: { id }, data: { stockUpdated: true, receivedAt: new Date() } });
                 }
                 // Received → Pending/Ordered: reverse stock
                 if (existing.stockUpdated && status !== "Received") {
@@ -148,7 +148,7 @@ function updatePurchaseStatus(req, res) {
                         });
                         yield (0, product_service_1.syncProductStock)(variant.productId, tx);
                     }
-                    yield tx.purchase.update({ where: { id }, data: { stockUpdated: false } });
+                    yield tx.purchase.update({ where: { id }, data: { stockUpdated: false, receivedAt: null } });
                 }
                 return tx.purchase.update({ where: { id }, data: { status } });
             }));

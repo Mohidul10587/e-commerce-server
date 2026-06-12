@@ -2,7 +2,7 @@ import { Router } from "express";
 import {
   login, signup, me, refresh, logout, changePassword,
   getUsers, createUser, updateUser,
-  moveUserToTrash, restoreUser, permanentDeleteUser,
+  moveUserToTrash, restoreUser, permanentDeleteUser, emptyUserTrash,
 } from "./controller";
 import { verifyUser, verifyAdmin } from "../../middleware/auth";
 
@@ -19,6 +19,7 @@ router.put("/change-password", verifyUser, changePassword);
 router.get("/", verifyAdmin, getUsers);
 router.post("/", verifyAdmin, createUser);
 router.put("/:id", verifyAdmin, updateUser);
+router.delete("/trash/empty", verifyAdmin, emptyUserTrash);
 router.delete("/:id", verifyAdmin, moveUserToTrash);
 router.patch("/:id/restore", verifyAdmin, restoreUser);
 router.delete("/:id/permanent", verifyAdmin, permanentDeleteUser);

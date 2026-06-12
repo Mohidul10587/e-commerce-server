@@ -1,0 +1,2 @@
+ALTER TABLE "Order" ADD COLUMN "confirmedAt" TIMESTAMP(3);
+ALTER TABLE "Purchase" ADD COLUMN "receivedAt" TIMESTAMP(3);

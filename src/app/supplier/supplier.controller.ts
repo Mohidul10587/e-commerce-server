@@ -94,3 +94,12 @@ export async function deleteSupplier(req: Request, res: Response) {
     return res.status(500).json({ message: "Server error", error });
   }
 }
+
+export async function emptySupplierTrash(_req: Request, res: Response) {
+  try {
+    const { count } = await prisma.supplier.deleteMany({ where: { isTrashed: true } });
+    return res.json({ message: `${count} suppliers permanently deleted` });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}

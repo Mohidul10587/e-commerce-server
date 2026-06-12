@@ -251,7 +251,11 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
         await tx.order.update({ where: { id }, data: { stockDeducted: false } });
       }
 
-      await tx.order.update({ where: { id }, data: { status } });
+      const extraData: any = { status };
+      if (status === "OrderConfirmed" && !existing.confirmedAt) {
+        extraData.confirmedAt = new Date();
+      }
+      await tx.order.update({ where: { id }, data: extraData });
     });
 
     const order = await prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
@@ -666,6 +670,15 @@ export const updateOrderPayment = async (req: Request, res: Response) => {
 
     io.emit("order:updated", order);
     return res.json({ order });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const emptyOrderTrash = async (_req: Request, res: Response) => {
+  try {
+    const { count } = await prisma.order.deleteMany({ where: { isTrashed: true } });
+    return res.json({ message: `${count} orders permanently deleted` });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
   }

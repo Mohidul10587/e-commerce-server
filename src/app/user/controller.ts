@@ -231,6 +231,15 @@ export async function permanentDeleteUser(req: Request, res: Response) {
   }
 }
 
+export async function emptyUserTrash(_req: Request, res: Response) {
+  try {
+    const { count } = await prisma.user.deleteMany({ where: { isTrashed: true } });
+    return res.json({ message: `${count} users permanently deleted` });
+  } catch {
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
 export async function changePassword(req: Request, res: Response) {
   try {
     const token = req.cookies.token;

@@ -2,7 +2,7 @@ import { Router } from "express";
 import {
   createOrder, getOrders, getOrderById,
   updateOrderStatus, updateOrder, updateOrderPayment, updateOrderDiscount,
-  moveOrderToTrash, restoreOrder, permanentDeleteOrder,
+  moveOrderToTrash, restoreOrder, permanentDeleteOrder, emptyOrderTrash,
   updateOrderItemSealText, addOrderItem, removeOrderItem, updateOrderItemQuantity, updateOrderItemVariant,
   bulkTrashOrders, bulkRestoreOrders, bulkUpdateOrderStatus,
   getOrderStatusCounts,
@@ -34,6 +34,7 @@ orderRoutes.patch("/:id/payment", updateOrderPayment);
 orderRoutes.patch("/:id/discount", updateOrderDiscount);
 orderRoutes.post("/:id/items", addOrderItem);
 orderRoutes.put("/:id", updateOrder);
+orderRoutes.delete("/trash/empty", emptyOrderTrash);
 orderRoutes.delete("/:id", moveOrderToTrash);
 orderRoutes.patch("/:id/restore", restoreOrder);
 orderRoutes.delete("/:id/permanent", permanentDeleteOrder);
