@@ -11,81 +11,98 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getFinancialLog = getFinancialLog;
 const prisma_1 = require("../../lib/prisma");
-// GET /finances/log?period=daily|weekly|monthly&date=YYYY-MM-DD
 function getFinancialLog(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b;
         try {
             const period = req.query.period || "daily";
             const dateParam = req.query.date;
-            const now = dateParam ? new Date(dateParam) : new Date();
-            let start;
-            let end;
+            const type = req.query.type;
+            const sort = req.query.sort === "asc" ? "asc" : "desc";
+            // tzOffset: client's UTC offset in minutes (e.g. Bangladesh = -360, meaning UTC+6)
+            const tzOffset = parseInt(req.query.tzOffset) || 0;
+            // Build start/end in UTC by adjusting for client timezone
+            function localMidnight(dateStr, offsetMinutes) {
+                // dateStr = "YYYY-MM-DD", offsetMinutes = new Date().getTimezoneOffset() from client
+                // getTimezoneOffset returns negative for ahead-of-UTC zones (BD = -360)
+                const [y, m, d] = dateStr.split("-").map(Number);
+                // Local midnight in UTC = midnight - offset
+                return new Date(Date.UTC(y, m - 1, d, 0, 0, 0) + offsetMinutes * 60 * 1000);
+            }
+            function localEndOfDay(dateStr, offsetMinutes) {
+                const [y, m, d] = dateStr.split("-").map(Number);
+                return new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999) + offsetMinutes * 60 * 1000);
+            }
+            const today = dateParam || new Date().toISOString().slice(0, 10);
+            let start, end;
             if (period === "weekly") {
-                const day = now.getDay(); // 0=Sun
-                start = new Date(now);
-                start.setDate(now.getDate() - day);
-                start.setHours(0, 0, 0, 0);
-                end = new Date(start);
-                end.setDate(start.getDate() + 6);
-                end.setHours(23, 59, 59, 999);
+                const base = localMidnight(today, tzOffset);
+                const day = new Date(base.getTime() - tzOffset * 60 * 1000).getUTCDay();
+                start = new Date(base.getTime() - day * 86400000);
+                end = new Date(start.getTime() + 6 * 86400000 + 23 * 3600000 + 59 * 60000 + 59999);
             }
             else if (period === "monthly") {
-                start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-                end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+                const [y, m] = today.split("-").map(Number);
+                start = localMidnight(`${y}-${String(m).padStart(2, "0")}-01`, tzOffset);
+                const lastDay = new Date(y, m, 0).getDate();
+                end = localEndOfDay(`${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`, tzOffset);
             }
             else {
-                // daily
-                start = new Date(now);
-                start.setHours(0, 0, 0, 0);
-                end = new Date(now);
-                end.setHours(23, 59, 59, 999);
+                start = localMidnight(today, tzOffset);
+                end = localEndOfDay(today, tzOffset);
             }
-            // Income: orders where payment was recorded (paidAt) in this period
-            const orders = yield prisma_1.prisma.order.findMany({
-                where: {
-                    isTrashed: false,
-                    paymentStatus: { not: "unpaid" },
-                    paidAt: { gte: start, lte: end },
-                },
-                select: {
-                    id: true,
-                    customerName: true,
-                    customerPhone: true,
-                    total: true,
-                    paidAmount: true,
-                    paymentStatus: true,
-                    paidAt: true,
-                },
-                orderBy: { paidAt: "desc" },
-            });
-            // Expense: purchases received in this period
-            const purchases = yield prisma_1.prisma.purchase.findMany({
-                where: {
-                    date: { gte: start, lte: end },
-                },
-                select: {
-                    id: true,
-                    date: true,
-                    totalAmount: true,
-                    status: true,
-                    note: true,
-                    supplier: { select: { id: true, name: true } },
-                },
-                orderBy: { date: "desc" },
-            });
-            const totalIncome = orders.reduce((s, o) => s + o.paidAmount, 0);
-            const totalExpense = purchases.reduce((s, p) => s + p.totalAmount, 0);
+            const entries = [];
+            if (!type || type === "income") {
+                const txns = yield prisma_1.prisma.paymentTransaction.findMany({
+                    where: { createdAt: { gte: start, lte: end }, order: { isTrashed: false } },
+                    select: {
+                        id: true, amount: true, note: true, createdAt: true,
+                        order: { select: { id: true, customerName: true, customerPhone: true } },
+                    },
+                });
+                for (const t of txns) {
+                    entries.push({
+                        id: `income-${t.id}`,
+                        type: "income",
+                        amount: t.amount,
+                        note: t.note,
+                        date: t.createdAt,
+                        ref: `Order #${t.order.id}`,
+                        detail: `${t.order.customerName} (${t.order.customerPhone})`,
+                    });
+                }
+            }
+            if (!type || type === "expense") {
+                const purchases = yield prisma_1.prisma.purchase.findMany({
+                    where: { date: { gte: start, lte: end } },
+                    select: {
+                        id: true, totalAmount: true, note: true, date: true, status: true,
+                        supplier: { select: { name: true } },
+                    },
+                });
+                for (const p of purchases) {
+                    entries.push({
+                        id: `expense-${p.id}`,
+                        type: "expense",
+                        amount: p.totalAmount,
+                        note: p.note,
+                        date: p.date,
+                        ref: `Purchase #${p.id}`,
+                        detail: (_b = (_a = p.supplier) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : "No supplier",
+                    });
+                }
+            }
+            entries.sort((a, b) => sort === "asc"
+                ? a.date.getTime() - b.date.getTime()
+                : b.date.getTime() - a.date.getTime());
+            const totalIncome = entries.filter(e => e.type === "income").reduce((s, e) => s + e.amount, 0);
+            const totalExpense = entries.filter(e => e.type === "expense").reduce((s, e) => s + e.amount, 0);
             return res.json({
                 period,
                 start: start.toISOString(),
                 end: end.toISOString(),
-                summary: {
-                    totalIncome,
-                    totalExpense,
-                    netProfit: totalIncome - totalExpense,
-                },
-                incomeEntries: orders,
-                expenseEntries: purchases,
+                summary: { totalIncome, totalExpense, netProfit: totalIncome - totalExpense },
+                entries,
             });
         }
         catch (err) {

@@ -156,6 +156,7 @@ model Order {
   id              Int           @id @default(autoincrement())
   customerName    String
   customerPhone   String
+  alternativePhone String?
   address         String
   items           OrderItem[]
   subtotal        Float
@@ -168,7 +169,9 @@ model Order {
   paymentStatus   PaymentStatus @default(unpaid)
   paidAt          DateTime?
   isTrashed       Boolean       @default(false)
+  stockDeducted   Boolean       @default(false)
   note            String?
+  contactLink     String?
   transactions    PaymentTransaction[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -225,6 +228,7 @@ model Purchase {
   totalAmount Float
   note        String?
   stockUpdated Boolean       @default(false)
+  isTrashed   Boolean        @default(false)
   items       PurchaseItem[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt

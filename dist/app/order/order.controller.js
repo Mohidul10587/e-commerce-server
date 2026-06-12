@@ -60,9 +60,8 @@ const getOrderStatusCounts = (_req, res) => __awaiter(void 0, void 0, void 0, fu
 });
 exports.getOrderStatusCounts = getOrderStatusCounts;
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
-        const { customerName, customerPhone, address, items, deliveryCharge, note, discount, discountPercent, } = req.body;
+        const { customerName, customerPhone, alternativePhone, address, items, deliveryCharge, note, discount, discountPercent, status, } = req.body;
         if (!customerName || !customerPhone || !address || !(items === null || items === void 0 ? void 0 : items.length))
             return res.status(400).json({ message: "Missing required fields" });
         let subtotal = 0;
@@ -77,10 +76,6 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 return res
                     .status(400)
                     .json({ message: `Variant ${item.variantId} not found` });
-            if (variant.stock < item.quantity)
-                return res
-                    .status(400)
-                    .json({ message: `Insufficient stock for ${variant.product.title}` });
             const price = isFree ? 0 : variant.salePrice;
             subtotal += price * item.quantity;
             resolvedItems.push({
@@ -99,47 +94,19 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             data: {
                 customerName,
                 customerPhone,
+                alternativePhone: alternativePhone || null,
                 address,
                 subtotal,
                 deliveryCharge: charge,
                 total: subtotal + charge - disc,
                 discount: disc,
                 discountPercent: discPct,
+                status: status || undefined,
                 note: note || null,
                 items: { create: resolvedItems },
             },
             include: { items: true },
         });
-        for (const item of resolvedItems) {
-            yield prisma_1.prisma.productVariant.update({
-                where: { id: item.variantId },
-                data: { stock: { decrement: item.quantity } },
-            });
-            yield prisma_1.prisma.stockHistory.create({
-                data: {
-                    variantId: item.variantId,
-                    action: "SALE",
-                    quantity: item.quantity,
-                    note: `Order #${order.id}`,
-                },
-            });
-        }
-        const productIds = [
-            ...new Set((yield prisma_1.prisma.productVariant.findMany({
-                where: { id: { in: resolvedItems.map((i) => i.variantId) } },
-                select: { productId: true },
-            })).map((v) => v.productId)),
-        ];
-        for (const productId of productIds) {
-            const agg = yield prisma_1.prisma.productVariant.aggregate({
-                where: { productId },
-                _sum: { stock: true },
-            });
-            yield prisma_1.prisma.product.update({
-                where: { id: productId },
-                data: { totalStock: (_a = agg._sum.stock) !== null && _a !== void 0 ? _a : 0 },
-            });
-        }
         index_1.io.emit("order:new", order);
         return res
             .status(201)
@@ -209,11 +176,58 @@ exports.getOrderById = getOrderById;
 const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { status } = req.body;
-        const order = yield prisma_1.prisma.order.update({
-            where: { id: Number(req.params.id) },
-            data: { status },
+        const id = Number(req.params.id);
+        const existing = yield prisma_1.prisma.order.findUniqueOrThrow({
+            where: { id },
             include: { items: true },
         });
+        yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a, _b;
+            // Confirm → deduct stock (only once)
+            if (status === "OrderConfirmed" && !existing.stockDeducted) {
+                for (const item of existing.items) {
+                    const variant = yield tx.productVariant.findUnique({
+                        where: { id: item.variantId },
+                        select: { productId: true, stock: true },
+                    });
+                    if (!variant)
+                        continue;
+                    yield tx.productVariant.update({
+                        where: { id: item.variantId },
+                        data: { stock: { decrement: item.quantity } },
+                    });
+                    yield tx.stockHistory.create({
+                        data: { variantId: item.variantId, action: "SALE", quantity: item.quantity, note: `Order #${id} confirmed` },
+                    });
+                    const agg = yield tx.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { stock: true } });
+                    yield tx.product.update({ where: { id: variant.productId }, data: { totalStock: (_a = agg._sum.stock) !== null && _a !== void 0 ? _a : 0 } });
+                }
+                yield tx.order.update({ where: { id }, data: { stockDeducted: true } });
+            }
+            // Cancel → restore stock (only if already deducted)
+            if (status === "Cancel" && existing.stockDeducted) {
+                for (const item of existing.items) {
+                    const variant = yield tx.productVariant.findUnique({
+                        where: { id: item.variantId },
+                        select: { productId: true },
+                    });
+                    if (!variant)
+                        continue;
+                    yield tx.productVariant.update({
+                        where: { id: item.variantId },
+                        data: { stock: { increment: item.quantity } },
+                    });
+                    yield tx.stockHistory.create({
+                        data: { variantId: item.variantId, action: "RETURN", quantity: item.quantity, note: `Order #${id} cancelled` },
+                    });
+                    const agg = yield tx.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { stock: true } });
+                    yield tx.product.update({ where: { id: variant.productId }, data: { totalStock: (_b = agg._sum.stock) !== null && _b !== void 0 ? _b : 0 } });
+                }
+                yield tx.order.update({ where: { id }, data: { stockDeducted: false } });
+            }
+            yield tx.order.update({ where: { id }, data: { status } });
+        }));
+        const order = yield prisma_1.prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
         index_1.io.emit("order:updated", order);
         return res.json({ order });
     }
@@ -226,12 +240,14 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     var _a;
     try {
         const id = Number(req.params.id);
-        const { customerName, customerPhone, address, status, discount, discountPercent, paidAmount, items, } = req.body;
+        const { customerName, customerPhone, alternativePhone, address, status, discount, discountPercent, paidAmount, items, } = req.body;
         const data = {};
         if (customerName)
             data.customerName = customerName;
         if (customerPhone)
             data.customerPhone = customerPhone;
+        if (alternativePhone !== undefined)
+            data.alternativePhone = alternativePhone || null;
         if (address)
             data.address = address;
         if (status)
@@ -287,15 +303,6 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             data.discountPercent = Number(discountPercent);
         const newTotal = subtotal + deliveryCharge - (disc !== null && disc !== void 0 ? disc : 0);
         data.total = newTotal;
-        if (paidAmount !== undefined &&
-            !isNaN(Number(paidAmount)) &&
-            Number(paidAmount) >= 0) {
-            const paid = Number(paidAmount);
-            data.paidAmount = paid;
-            data.paymentStatus =
-                paid <= 0 ? "unpaid" : paid >= newTotal ? "paid" : "partial";
-            data.paidAt = paid > 0 ? new Date() : null;
-        }
         const order = yield prisma_1.prisma.order.update({
             where: { id },
             data,
@@ -586,29 +593,27 @@ exports.updateOrderDiscount = updateOrderDiscount;
 const updateOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const id = Number(req.params.id);
-        const { paidAmount } = req.body;
-        if (paidAmount === undefined ||
-            isNaN(Number(paidAmount)) ||
-            Number(paidAmount) < 0)
-            return res.status(400).json({ message: "Valid paidAmount is required" });
-        const paid = Number(paidAmount);
-        // Fetch total to compute paymentStatus
+        const { amount, note, source, trxId } = req.body;
+        if (!amount || isNaN(Number(amount)) || Number(amount) <= 0)
+            return res.status(400).json({ message: "Valid amount is required" });
         const existing = yield prisma_1.prisma.order.findUnique({
             where: { id },
-            select: { total: true },
+            select: { total: true, paidAmount: true },
         });
         if (!existing)
             return res.status(404).json({ message: "Order not found" });
-        const paymentStatus = paid <= 0 ? "unpaid" : paid >= existing.total ? "paid" : "partial";
-        const order = yield prisma_1.prisma.order.update({
-            where: { id },
-            data: {
-                paidAmount: paid,
-                paymentStatus,
-                paidAt: paid > 0 ? new Date() : null,
-            },
-            include: { items: true },
-        });
+        const newPaid = existing.paidAmount + Number(amount);
+        const paymentStatus = newPaid >= existing.total ? "paid" : "partial";
+        const order = yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            yield tx.paymentTransaction.create({
+                data: { orderId: id, amount: Number(amount), note: note || null, source: source || null, trxId: trxId || null },
+            });
+            return tx.order.update({
+                where: { id },
+                data: { paidAmount: newPaid, paymentStatus, paidAt: new Date() },
+                include: { items: true, transactions: { orderBy: { createdAt: "asc" } } },
+            });
+        }));
         index_1.io.emit("order:updated", order);
         return res.json({ order });
     }

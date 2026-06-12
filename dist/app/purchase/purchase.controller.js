@@ -15,6 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getPurchases = getPurchases;
 exports.createPurchase = createPurchase;
 exports.updatePurchaseStatus = updatePurchaseStatus;
+exports.movePurchaseToTrash = movePurchaseToTrash;
+exports.restorePurchase = restorePurchase;
 exports.deletePurchase = deletePurchase;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
 const product_service_1 = require("../product/product.service");
@@ -42,7 +44,8 @@ function getPurchases(req, res) {
             const limit = parseInt(req.query.limit) || 20;
             const search = req.query.search || "";
             const status = req.query.status;
-            const where = {};
+            const trash = req.query.trash === "true";
+            const where = { isTrashed: trash };
             if (status)
                 where.status = status;
             if (search) {
@@ -120,21 +123,60 @@ function updatePurchaseStatus(req, res) {
                 where: { id },
                 include: { items: true },
             });
-            if (existing.stockUpdated && status === "Received") {
-                return res.status(400).json({ message: "Stock already updated for this purchase" });
-            }
             const updated = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
-                const purchase = yield tx.purchase.update({
-                    where: { id },
-                    data: { status },
-                });
+                // Pending/Ordered → Received: add stock
                 if (status === "Received" && !existing.stockUpdated) {
                     yield applyStockForPurchase(existing.items, id, tx);
                     yield tx.purchase.update({ where: { id }, data: { stockUpdated: true } });
                 }
-                return purchase;
+                // Received → Pending/Ordered: reverse stock
+                if (existing.stockUpdated && status !== "Received") {
+                    for (const item of existing.items) {
+                        const variant = yield tx.productVariant.findUnique({
+                            where: { id: item.variantId },
+                            select: { productId: true, stock: true },
+                        });
+                        if (!variant)
+                            continue;
+                        const newStock = Math.max(0, variant.stock - item.quantity);
+                        yield tx.productVariant.update({
+                            where: { id: item.variantId },
+                            data: { stock: newStock },
+                        });
+                        yield tx.stockHistory.create({
+                            data: { variantId: item.variantId, action: "REMOVE", quantity: item.quantity, note: `Purchase #${id} un-received` },
+                        });
+                        yield (0, product_service_1.syncProductStock)(variant.productId, tx);
+                    }
+                    yield tx.purchase.update({ where: { id }, data: { stockUpdated: false } });
+                }
+                return tx.purchase.update({ where: { id }, data: { status } });
             }));
             return res.json({ purchase: updated });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function movePurchaseToTrash(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const id = parseInt(req.params.id);
+            yield prisma_1.default.purchase.update({ where: { id }, data: { isTrashed: true } });
+            return res.json({ message: "Moved to trash" });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function restorePurchase(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const id = parseInt(req.params.id);
+            yield prisma_1.default.purchase.update({ where: { id }, data: { isTrashed: false } });
+            return res.json({ message: "Restored" });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });
@@ -145,12 +187,8 @@ function deletePurchase(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const id = parseInt(req.params.id);
-            const existing = yield prisma_1.default.purchase.findUniqueOrThrow({ where: { id } });
-            if (existing.stockUpdated) {
-                return res.status(400).json({ message: "Cannot delete a received purchase (stock already updated)" });
-            }
             yield prisma_1.default.purchase.delete({ where: { id } });
-            return res.json({ message: "Deleted" });
+            return res.json({ message: "Permanently deleted" });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });

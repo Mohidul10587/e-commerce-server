@@ -56,6 +56,7 @@ export const createOrder = async (req: Request, res: Response) => {
     const {
       customerName,
       customerPhone,
+      alternativePhone,
       address,
       items,
       deliveryCharge,
@@ -88,10 +89,6 @@ export const createOrder = async (req: Request, res: Response) => {
         return res
           .status(400)
           .json({ message: `Variant ${item.variantId} not found` });
-      if (variant.stock < item.quantity)
-        return res
-          .status(400)
-          .json({ message: `Insufficient stock for ${variant.product.title}` });
 
       const price = isFree ? 0 : variant.salePrice;
       subtotal += price * item.quantity;
@@ -113,6 +110,7 @@ export const createOrder = async (req: Request, res: Response) => {
       data: {
         customerName,
         customerPhone,
+        alternativePhone: alternativePhone || null,
         address,
         subtotal,
         deliveryCharge: charge,
@@ -125,42 +123,6 @@ export const createOrder = async (req: Request, res: Response) => {
       },
       include: { items: true },
     });
-
-    for (const item of resolvedItems) {
-      await prisma.productVariant.update({
-        where: { id: item.variantId },
-        data: { stock: { decrement: item.quantity } },
-      });
-      await prisma.stockHistory.create({
-        data: {
-          variantId: item.variantId,
-          action: "SALE",
-          quantity: item.quantity,
-          note: `Order #${order.id}`,
-        },
-      });
-    }
-
-    const productIds = [
-      ...new Set(
-        (
-          await prisma.productVariant.findMany({
-            where: { id: { in: resolvedItems.map((i) => i.variantId) } },
-            select: { productId: true },
-          })
-        ).map((v) => v.productId)
-      ),
-    ];
-    for (const productId of productIds) {
-      const agg = await prisma.productVariant.aggregate({
-        where: { productId },
-        _sum: { stock: true },
-      });
-      await prisma.product.update({
-        where: { id: productId },
-        data: { totalStock: agg._sum.stock ?? 0 },
-      });
-    }
 
     io.emit("order:new", order);
 
@@ -239,11 +201,60 @@ export const getOrderById = async (req: Request, res: Response) => {
 export const updateOrderStatus = async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
-    const order = await prisma.order.update({
-      where: { id: Number(req.params.id) },
-      data: { status },
+    const id = Number(req.params.id);
+
+    const existing = await prisma.order.findUniqueOrThrow({
+      where: { id },
       include: { items: true },
     });
+
+    await prisma.$transaction(async (tx) => {
+      // Confirm → deduct stock (only once)
+      if (status === "OrderConfirmed" && !existing.stockDeducted) {
+        for (const item of existing.items) {
+          const variant = await tx.productVariant.findUnique({
+            where: { id: item.variantId },
+            select: { productId: true, stock: true },
+          });
+          if (!variant) continue;
+          await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: { decrement: item.quantity } },
+          });
+          await tx.stockHistory.create({
+            data: { variantId: item.variantId, action: "SALE", quantity: item.quantity, note: `Order #${id} confirmed` },
+          });
+          const agg = await tx.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { stock: true } });
+          await tx.product.update({ where: { id: variant.productId }, data: { totalStock: agg._sum.stock ?? 0 } });
+        }
+        await tx.order.update({ where: { id }, data: { stockDeducted: true } });
+      }
+
+      // Cancel → restore stock (only if already deducted)
+      if (status === "Cancel" && existing.stockDeducted) {
+        for (const item of existing.items) {
+          const variant = await tx.productVariant.findUnique({
+            where: { id: item.variantId },
+            select: { productId: true },
+          });
+          if (!variant) continue;
+          await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: { increment: item.quantity } },
+          });
+          await tx.stockHistory.create({
+            data: { variantId: item.variantId, action: "RETURN", quantity: item.quantity, note: `Order #${id} cancelled` },
+          });
+          const agg = await tx.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { stock: true } });
+          await tx.product.update({ where: { id: variant.productId }, data: { totalStock: agg._sum.stock ?? 0 } });
+        }
+        await tx.order.update({ where: { id }, data: { stockDeducted: false } });
+      }
+
+      await tx.order.update({ where: { id }, data: { status } });
+    });
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
     io.emit("order:updated", order);
     return res.json({ order });
   } catch {
@@ -257,6 +268,7 @@ export const updateOrder = async (req: Request, res: Response) => {
     const {
       customerName,
       customerPhone,
+      alternativePhone,
       address,
       status,
       discount,
@@ -267,6 +279,7 @@ export const updateOrder = async (req: Request, res: Response) => {
     const data: any = {};
     if (customerName) data.customerName = customerName;
     if (customerPhone) data.customerPhone = customerPhone;
+    if (alternativePhone !== undefined) data.alternativePhone = alternativePhone || null;
     if (address) data.address = address;
     if (status) data.status = status;
 

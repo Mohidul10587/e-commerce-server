@@ -9,4 +9,6 @@ exports.purchaseRoutes = router;
 router.get("/", auth_1.verifyAdmin, purchase_controller_1.getPurchases);
 router.post("/", auth_1.verifyAdmin, purchase_controller_1.createPurchase);
 router.patch("/:id/status", auth_1.verifyAdmin, purchase_controller_1.updatePurchaseStatus);
-router.delete("/:id", auth_1.verifyAdmin, purchase_controller_1.deletePurchase);
+router.patch("/:id/restore", auth_1.verifyAdmin, purchase_controller_1.restorePurchase);
+router.delete("/:id", auth_1.verifyAdmin, purchase_controller_1.movePurchaseToTrash);
+router.delete("/:id/permanent", auth_1.verifyAdmin, purchase_controller_1.deletePurchase);

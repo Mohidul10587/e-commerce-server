@@ -30,8 +30,9 @@ export async function getPurchases(req: Request, res: Response) {
     const limit = parseInt(req.query.limit as string) || 20;
     const search = (req.query.search as string) || "";
     const status = req.query.status as string | undefined;
+    const trash = req.query.trash === "true";
 
-    const where: any = {};
+    const where: any = { isTrashed: trash };
     if (status) where.status = status;
     if (search) {
       where.OR = [
@@ -116,22 +117,35 @@ export async function updatePurchaseStatus(req: Request, res: Response) {
       include: { items: true },
     });
 
-    if (existing.stockUpdated && status === "Received") {
-      return res.status(400).json({ message: "Stock already updated for this purchase" });
-    }
-
     const updated = await prisma.$transaction(async (tx) => {
-      const purchase = await tx.purchase.update({
-        where: { id },
-        data: { status },
-      });
-
+      // Pending/Ordered → Received: add stock
       if (status === "Received" && !existing.stockUpdated) {
         await applyStockForPurchase(existing.items, id, tx);
         await tx.purchase.update({ where: { id }, data: { stockUpdated: true } });
       }
 
-      return purchase;
+      // Received → Pending/Ordered: reverse stock
+      if (existing.stockUpdated && status !== "Received") {
+        for (const item of existing.items) {
+          const variant = await tx.productVariant.findUnique({
+            where: { id: item.variantId },
+            select: { productId: true, stock: true },
+          });
+          if (!variant) continue;
+          const newStock = Math.max(0, variant.stock - item.quantity);
+          await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: newStock },
+          });
+          await tx.stockHistory.create({
+            data: { variantId: item.variantId, action: "REMOVE", quantity: item.quantity, note: `Purchase #${id} un-received` },
+          });
+          await syncProductStock(variant.productId, tx as any);
+        }
+        await tx.purchase.update({ where: { id }, data: { stockUpdated: false } });
+      }
+
+      return tx.purchase.update({ where: { id }, data: { status } });
     });
 
     return res.json({ purchase: updated });
@@ -140,15 +154,31 @@ export async function updatePurchaseStatus(req: Request, res: Response) {
   }
 }
 
+export async function movePurchaseToTrash(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.purchase.update({ where: { id }, data: { isTrashed: true } });
+    return res.json({ message: "Moved to trash" });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
+export async function restorePurchase(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.purchase.update({ where: { id }, data: { isTrashed: false } });
+    return res.json({ message: "Restored" });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
 export async function deletePurchase(req: Request, res: Response) {
   try {
     const id = parseInt(req.params.id);
-    const existing = await prisma.purchase.findUniqueOrThrow({ where: { id } });
-    if (existing.stockUpdated) {
-      return res.status(400).json({ message: "Cannot delete a received purchase (stock already updated)" });
-    }
     await prisma.purchase.delete({ where: { id } });
-    return res.json({ message: "Deleted" });
+    return res.json({ message: "Permanently deleted" });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }
