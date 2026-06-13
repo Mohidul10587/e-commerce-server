@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.payrollRoutes = void 0;
+const express_1 = require("express");
+const auth_1 = require("../../middleware/auth");
+const payroll_controller_1 = require("./payroll.controller");
+const router = (0, express_1.Router)();
+exports.payrollRoutes = router;
+router.get("/employees", auth_1.verifyAdmin, payroll_controller_1.getEmployees);
+router.get("/summary", auth_1.verifyAdmin, payroll_controller_1.getPayrollSummary);
+router.get("/", auth_1.verifyAdmin, payroll_controller_1.listPayrolls);
+router.post("/", auth_1.verifyAdmin, payroll_controller_1.createPayroll);
+router.put("/:id", auth_1.verifyAdmin, payroll_controller_1.updatePayroll);
+router.patch("/:id/pay", auth_1.verifyAdmin, payroll_controller_1.markAsPaid);
+router.delete("/:id", auth_1.verifyAdmin, payroll_controller_1.trashPayroll);
+router.patch("/:id/restore", auth_1.verifyAdmin, payroll_controller_1.restorePayroll);
+router.delete("/:id/permanent", auth_1.verifyAdmin, payroll_controller_1.permanentDeletePayroll);

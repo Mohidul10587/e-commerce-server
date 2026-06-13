@@ -248,3 +248,88 @@ model PurchaseItem {
   quantity      Int
   purchasePrice Float
 }
+
+model OfficeExpenseCategory {
+  id        Int             @id @default(autoincrement())
+  name      String
+  status    String          @default("active")
+  createdBy Int?
+  isTrashed Boolean         @default(false)
+  expenses  OfficeExpense[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@map("office_expense_categories")
+}
+
+model OfficeExpense {
+  id         Int                   @id @default(autoincrement())
+  categoryId Int
+  category   OfficeExpenseCategory @relation(fields: [categoryId], references: [id])
+  note       String
+  amount     Float
+  createdBy  Int?
+  isTrashed  Boolean               @default(false)
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  @@map("office_expenses")
+}
+
+model MarketingExpenseCategory {
+  id        Int                @id @default(autoincrement())
+  name      String
+  status    String             @default("active")
+  createdBy Int?
+  isTrashed Boolean            @default(false)
+  expenses  MarketingExpense[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@map("marketing_expense_categories")
+}
+
+model MarketingExpense {
+  id         Int                      @id @default(autoincrement())
+  categoryId Int
+  category   MarketingExpenseCategory @relation(fields: [categoryId], references: [id])
+  note       String
+  amount     Float
+  createdBy  Int?
+  isTrashed  Boolean                  @default(false)
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+
+  @@map("marketing_expenses")
+}
+
+model FinancialActivityLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  entity    String
+  entityId  Int
+  note      String?
+  amount    Float?
+  createdAt DateTime @default(now())
+
+  @@map("financial_activity_logs")
+}
+
+model Payroll {
+  id             Int      @id @default(autoincrement())
+  employeeId     Int
+  salaryMonth    String   // "YYYY-MM"
+  basicSalary    Float
+  overtime       Float    @default(0)
+  ta             Float    @default(0)
+  bonus          Float    @default(0)
+  totalPayable   Float
+  status         String   @default("Pending") // "Pending" | "Paid"
+  note           String?
+  paidAt         DateTime?
+  isTrashed      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("payrolls")
+}

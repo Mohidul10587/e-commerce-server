@@ -14,6 +14,8 @@ import { supplierRoutes } from "./app/supplier/supplier.routes";
 import { purchaseRoutes } from "./app/purchase/purchase.routes";
 import { inventoryRoutes } from "./app/inventory/inventory.routes";
 import { financeRoutes } from "./app/finance/finance.routes";
+import { expenseRoutes } from "./app/expense/expense.routes";
+import { payrollRoutes } from "./app/payroll/payroll.routes";
 
 dotenv.config();
 
@@ -55,6 +57,8 @@ app.use("/suppliers", supplierRoutes);
 app.use("/purchases", purchaseRoutes);
 app.use("/inventory", inventoryRoutes);
 app.use("/finances", financeRoutes);
+app.use("/expenses", expenseRoutes);
+app.use("/payroll", payrollRoutes);
 
 app.use(errorHandler);
 

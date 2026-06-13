@@ -1,0 +1,39 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.expenseRoutes = void 0;
+const express_1 = require("express");
+const auth_1 = require("../../middleware/auth");
+const expense_controller_1 = require("./expense.controller");
+const router = (0, express_1.Router)();
+exports.expenseRoutes = router;
+// Summary & Activity Log
+router.get("/summary", auth_1.verifyAdmin, expense_controller_1.getExpenseSummary);
+router.get("/activity-log", auth_1.verifyAdmin, expense_controller_1.getFinancialActivityLog);
+// Office Expense Categories
+router.get("/office-expense-categories", auth_1.verifyAdmin, expense_controller_1.listOfficeExpenseCategories);
+router.post("/office-expense-categories", auth_1.verifyAdmin, expense_controller_1.createOfficeExpenseCategory);
+router.put("/office-expense-categories/:id", auth_1.verifyAdmin, expense_controller_1.updateOfficeExpenseCategory);
+router.delete("/office-expense-categories/:id", auth_1.verifyAdmin, expense_controller_1.trashOfficeExpenseCategory);
+router.patch("/office-expense-categories/:id/restore", auth_1.verifyAdmin, expense_controller_1.restoreOfficeExpenseCategory);
+router.delete("/office-expense-categories/:id/permanent", auth_1.verifyAdmin, expense_controller_1.permanentDeleteOfficeExpenseCategory);
+// Marketing Expense Categories
+router.get("/marketing-expense-categories", auth_1.verifyAdmin, expense_controller_1.listMarketingExpenseCategories);
+router.post("/marketing-expense-categories", auth_1.verifyAdmin, expense_controller_1.createMarketingExpenseCategory);
+router.put("/marketing-expense-categories/:id", auth_1.verifyAdmin, expense_controller_1.updateMarketingExpenseCategory);
+router.delete("/marketing-expense-categories/:id", auth_1.verifyAdmin, expense_controller_1.trashMarketingExpenseCategory);
+router.patch("/marketing-expense-categories/:id/restore", auth_1.verifyAdmin, expense_controller_1.restoreMarketingExpenseCategory);
+router.delete("/marketing-expense-categories/:id/permanent", auth_1.verifyAdmin, expense_controller_1.permanentDeleteMarketingExpenseCategory);
+// Office Expenses
+router.get("/office-expenses", auth_1.verifyAdmin, expense_controller_1.listOfficeExpenses);
+router.post("/office-expenses", auth_1.verifyAdmin, expense_controller_1.createOfficeExpense);
+router.put("/office-expenses/:id", auth_1.verifyAdmin, expense_controller_1.updateOfficeExpense);
+router.delete("/office-expenses/:id", auth_1.verifyAdmin, expense_controller_1.trashOfficeExpense);
+router.patch("/office-expenses/:id/restore", auth_1.verifyAdmin, expense_controller_1.restoreOfficeExpense);
+router.delete("/office-expenses/:id/permanent", auth_1.verifyAdmin, expense_controller_1.permanentDeleteOfficeExpense);
+// Marketing Expenses
+router.get("/marketing-expenses", auth_1.verifyAdmin, expense_controller_1.listMarketingExpenses);
+router.post("/marketing-expenses", auth_1.verifyAdmin, expense_controller_1.createMarketingExpense);
+router.put("/marketing-expenses/:id", auth_1.verifyAdmin, expense_controller_1.updateMarketingExpense);
+router.delete("/marketing-expenses/:id", auth_1.verifyAdmin, expense_controller_1.trashMarketingExpense);
+router.patch("/marketing-expenses/:id/restore", auth_1.verifyAdmin, expense_controller_1.restoreMarketingExpense);
+router.delete("/marketing-expenses/:id/permanent", auth_1.verifyAdmin, expense_controller_1.permanentDeleteMarketingExpense);

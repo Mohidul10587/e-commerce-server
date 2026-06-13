@@ -1,0 +1,17 @@
+CREATE TABLE "payrolls" (
+    "id" SERIAL NOT NULL,
+    "employeeId" INTEGER NOT NULL,
+    "salaryMonth" TEXT NOT NULL,
+    "basicSalary" DOUBLE PRECISION NOT NULL,
+    "overtime" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "ta" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "bonus" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "totalPayable" DOUBLE PRECISION NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'Pending',
+    "note" TEXT,
+    "paidAt" TIMESTAMP(3),
+    "isTrashed" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "payrolls_pkey" PRIMARY KEY ("id")
+);
