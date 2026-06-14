@@ -58,6 +58,7 @@ export const createOrder = async (req: Request, res: Response) => {
       customerPhone,
       alternativePhone,
       address,
+      contactLink,
       items,
       deliveryCharge,
       note,
@@ -112,6 +113,7 @@ export const createOrder = async (req: Request, res: Response) => {
         customerPhone,
         alternativePhone: alternativePhone || null,
         address,
+        contactLink: contactLink || null,
         subtotal,
         deliveryCharge: charge,
         total: subtotal + charge - disc,
@@ -274,17 +276,21 @@ export const updateOrder = async (req: Request, res: Response) => {
       customerPhone,
       alternativePhone,
       address,
+      contactLink,
       status,
       discount,
       discountPercent,
       paidAmount,
       items,
+      note,
     } = req.body;
     const data: any = {};
     if (customerName) data.customerName = customerName;
     if (customerPhone) data.customerPhone = customerPhone;
     if (alternativePhone !== undefined) data.alternativePhone = alternativePhone || null;
     if (address) data.address = address;
+    if (contactLink !== undefined) data.contactLink = contactLink || null;
+    if (note !== undefined) data.note = note || null;
     if (status) data.status = status;
 
     // Replace items if provided
@@ -634,6 +640,76 @@ export const updateOrderDiscount = async (req: Request, res: Response) => {
     });
     io.emit("order:updated", order);
     return res.json({ order });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getOrderPayments = async (req: Request, res: Response) => {
+  try {
+    const transactions = await prisma.paymentTransaction.findMany({
+      where: { orderId: Number(req.params.id) },
+      orderBy: { createdAt: "asc" },
+    });
+    return res.json({ transactions });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const deleteOrderPayment = async (req: Request, res: Response) => {
+  try {
+    const txId = Number(req.params.txId);
+    const tx = await prisma.paymentTransaction.findUnique({ where: { id: txId } });
+    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+
+    await prisma.paymentTransaction.delete({ where: { id: txId } });
+
+    // Recalculate paidAmount from remaining transactions
+    const agg = await prisma.paymentTransaction.aggregate({
+      where: { orderId: tx.orderId },
+      _sum: { amount: true },
+    });
+    const newPaid = agg._sum.amount ?? 0;
+    const order = await prisma.order.findUnique({ where: { id: tx.orderId }, select: { total: true } });
+    const paymentStatus = newPaid <= 0 ? "unpaid" : newPaid >= (order?.total ?? 0) ? "paid" : "partial";
+    await prisma.order.update({ where: { id: tx.orderId }, data: { paidAmount: newPaid, paymentStatus } });
+
+    io.emit("order:updated", { id: tx.orderId });
+    return res.json({ message: "Payment deleted" });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const updateOrderPaymentTx = async (req: Request, res: Response) => {
+  try {
+    const txId = Number(req.params.txId);
+    const { amount, source, trxId, note } = req.body;
+    const tx = await prisma.paymentTransaction.findUnique({ where: { id: txId } });
+    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+
+    await prisma.paymentTransaction.update({
+      where: { id: txId },
+      data: {
+        amount: amount !== undefined ? Number(amount) : tx.amount,
+        source: source !== undefined ? source || null : tx.source,
+        trxId: trxId !== undefined ? trxId || null : tx.trxId,
+        note: note !== undefined ? note || null : tx.note,
+      },
+    });
+
+    const agg = await prisma.paymentTransaction.aggregate({
+      where: { orderId: tx.orderId },
+      _sum: { amount: true },
+    });
+    const newPaid = agg._sum.amount ?? 0;
+    const order = await prisma.order.findUnique({ where: { id: tx.orderId }, select: { total: true } });
+    const paymentStatus = newPaid <= 0 ? "unpaid" : newPaid >= (order?.total ?? 0) ? "paid" : "partial";
+    await prisma.order.update({ where: { id: tx.orderId }, data: { paidAmount: newPaid, paymentStatus } });
+
+    io.emit("order:updated", { id: tx.orderId });
+    return res.json({ message: "Payment updated" });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
   }

@@ -5,7 +5,7 @@ import {
   moveOrderToTrash, restoreOrder, permanentDeleteOrder, emptyOrderTrash,
   updateOrderItemSealText, addOrderItem, removeOrderItem, updateOrderItemQuantity, updateOrderItemVariant,
   bulkTrashOrders, bulkRestoreOrders, bulkUpdateOrderStatus,
-  getOrderStatusCounts,
+  getOrderStatusCounts, getOrderPayments, deleteOrderPayment, updateOrderPaymentTx,
 } from "./order.controller";
 import { verifyUser } from "../../middleware/auth";
 
@@ -31,6 +31,9 @@ orderRoutes.get("/", getOrders);
 orderRoutes.get("/:id", getOrderById);
 orderRoutes.patch("/:id/status", updateOrderStatus);
 orderRoutes.patch("/:id/payment", updateOrderPayment);
+orderRoutes.get("/:id/payments", getOrderPayments);
+orderRoutes.patch("/:id/payments/:txId", updateOrderPaymentTx);
+orderRoutes.delete("/:id/payments/:txId", deleteOrderPayment);
 orderRoutes.patch("/:id/discount", updateOrderDiscount);
 orderRoutes.post("/:id/items", addOrderItem);
 orderRoutes.put("/:id", updateOrder);
