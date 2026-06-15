@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { verifyAdmin } from "../../middleware/auth";
+import { verifyAdminOrManager } from "../../middleware/auth";
 import {
   getExpenseSummary,
   getFinancialActivityLog,
@@ -31,40 +31,35 @@ import {
 
 const router = Router();
 
-// Summary & Activity Log
-router.get("/summary", verifyAdmin, getExpenseSummary);
-router.get("/activity-log", verifyAdmin, getFinancialActivityLog);
+router.get("/summary", verifyAdminOrManager, getExpenseSummary);
+router.get("/activity-log", verifyAdminOrManager, getFinancialActivityLog);
 
-// Office Expense Categories
-router.get("/office-expense-categories", verifyAdmin, listOfficeExpenseCategories);
-router.post("/office-expense-categories", verifyAdmin, createOfficeExpenseCategory);
-router.put("/office-expense-categories/:id", verifyAdmin, updateOfficeExpenseCategory);
-router.delete("/office-expense-categories/:id", verifyAdmin, trashOfficeExpenseCategory);
-router.patch("/office-expense-categories/:id/restore", verifyAdmin, restoreOfficeExpenseCategory);
-router.delete("/office-expense-categories/:id/permanent", verifyAdmin, permanentDeleteOfficeExpenseCategory);
+router.get("/office-expense-categories", verifyAdminOrManager, listOfficeExpenseCategories);
+router.post("/office-expense-categories", verifyAdminOrManager, createOfficeExpenseCategory);
+router.put("/office-expense-categories/:id", verifyAdminOrManager, updateOfficeExpenseCategory);
+router.delete("/office-expense-categories/:id", verifyAdminOrManager, trashOfficeExpenseCategory);
+router.patch("/office-expense-categories/:id/restore", verifyAdminOrManager, restoreOfficeExpenseCategory);
+router.delete("/office-expense-categories/:id/permanent", verifyAdminOrManager, permanentDeleteOfficeExpenseCategory);
 
-// Marketing Expense Categories
-router.get("/marketing-expense-categories", verifyAdmin, listMarketingExpenseCategories);
-router.post("/marketing-expense-categories", verifyAdmin, createMarketingExpenseCategory);
-router.put("/marketing-expense-categories/:id", verifyAdmin, updateMarketingExpenseCategory);
-router.delete("/marketing-expense-categories/:id", verifyAdmin, trashMarketingExpenseCategory);
-router.patch("/marketing-expense-categories/:id/restore", verifyAdmin, restoreMarketingExpenseCategory);
-router.delete("/marketing-expense-categories/:id/permanent", verifyAdmin, permanentDeleteMarketingExpenseCategory);
+router.get("/marketing-expense-categories", verifyAdminOrManager, listMarketingExpenseCategories);
+router.post("/marketing-expense-categories", verifyAdminOrManager, createMarketingExpenseCategory);
+router.put("/marketing-expense-categories/:id", verifyAdminOrManager, updateMarketingExpenseCategory);
+router.delete("/marketing-expense-categories/:id", verifyAdminOrManager, trashMarketingExpenseCategory);
+router.patch("/marketing-expense-categories/:id/restore", verifyAdminOrManager, restoreMarketingExpenseCategory);
+router.delete("/marketing-expense-categories/:id/permanent", verifyAdminOrManager, permanentDeleteMarketingExpenseCategory);
 
-// Office Expenses
-router.get("/office-expenses", verifyAdmin, listOfficeExpenses);
-router.post("/office-expenses", verifyAdmin, createOfficeExpense);
-router.put("/office-expenses/:id", verifyAdmin, updateOfficeExpense);
-router.delete("/office-expenses/:id", verifyAdmin, trashOfficeExpense);
-router.patch("/office-expenses/:id/restore", verifyAdmin, restoreOfficeExpense);
-router.delete("/office-expenses/:id/permanent", verifyAdmin, permanentDeleteOfficeExpense);
+router.get("/office-expenses", verifyAdminOrManager, listOfficeExpenses);
+router.post("/office-expenses", verifyAdminOrManager, createOfficeExpense);
+router.put("/office-expenses/:id", verifyAdminOrManager, updateOfficeExpense);
+router.delete("/office-expenses/:id", verifyAdminOrManager, trashOfficeExpense);
+router.patch("/office-expenses/:id/restore", verifyAdminOrManager, restoreOfficeExpense);
+router.delete("/office-expenses/:id/permanent", verifyAdminOrManager, permanentDeleteOfficeExpense);
 
-// Marketing Expenses
-router.get("/marketing-expenses", verifyAdmin, listMarketingExpenses);
-router.post("/marketing-expenses", verifyAdmin, createMarketingExpense);
-router.put("/marketing-expenses/:id", verifyAdmin, updateMarketingExpense);
-router.delete("/marketing-expenses/:id", verifyAdmin, trashMarketingExpense);
-router.patch("/marketing-expenses/:id/restore", verifyAdmin, restoreMarketingExpense);
-router.delete("/marketing-expenses/:id/permanent", verifyAdmin, permanentDeleteMarketingExpense);
+router.get("/marketing-expenses", verifyAdminOrManager, listMarketingExpenses);
+router.post("/marketing-expenses", verifyAdminOrManager, createMarketingExpense);
+router.put("/marketing-expenses/:id", verifyAdminOrManager, updateMarketingExpense);
+router.delete("/marketing-expenses/:id", verifyAdminOrManager, trashMarketingExpense);
+router.patch("/marketing-expenses/:id/restore", verifyAdminOrManager, restoreMarketingExpense);
+router.delete("/marketing-expenses/:id/permanent", verifyAdminOrManager, permanentDeleteMarketingExpense);
 
 export { router as expenseRoutes };

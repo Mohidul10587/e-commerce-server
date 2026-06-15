@@ -1,1 +1,0 @@
-ALTER TABLE "OrderItem" ADD COLUMN "isFreeItem" BOOLEAN NOT NULL DEFAULT false;

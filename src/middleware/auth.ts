@@ -91,3 +91,45 @@ export const verifyAdmin = async (
     return sessionExpired(res);
   }
 };
+
+export const verifyAdminOrManager = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) return sessionExpired(res);
+
+    const user = await getUserFromToken(req);
+    if (!user) return sessionExpired(res);
+    if (user.role !== "admin" && user.role !== "manager")
+      return res.status(403).json({ message: "Access required" });
+    // @ts-ignore
+    req.user = user;
+    next();
+  } catch {
+    return sessionExpired(res);
+  }
+};
+
+export const verifyAdminManagerOrSupport = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) return sessionExpired(res);
+
+    const user = await getUserFromToken(req);
+    if (!user) return sessionExpired(res);
+    if (user.role !== "admin" && user.role !== "manager" && user.role !== "support")
+      return res.status(403).json({ message: "Access required" });
+    // @ts-ignore
+    req.user = user;
+    next();
+  } catch {
+    return sessionExpired(res);
+  }
+};

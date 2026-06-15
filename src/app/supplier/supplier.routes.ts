@@ -3,16 +3,16 @@ import {
   getSuppliers, createSupplier, updateSupplier,
   trashSupplier, restoreSupplier, deleteSupplier, emptySupplierTrash,
 } from "./supplier.controller";
-import { verifyAdmin } from "../../middleware/auth";
+import { verifyAdminOrManager } from "../../middleware/auth";
 
 const router = Router();
 
-router.get("/", verifyAdmin, getSuppliers);
-router.post("/", verifyAdmin, createSupplier);
-router.put("/:id", verifyAdmin, updateSupplier);
-router.delete("/trash/empty", verifyAdmin, emptySupplierTrash);
-router.delete("/:id", verifyAdmin, trashSupplier);
-router.patch("/:id/restore", verifyAdmin, restoreSupplier);
-router.delete("/:id/permanent", verifyAdmin, deleteSupplier);
+router.get("/", verifyAdminOrManager, getSuppliers);
+router.post("/", verifyAdminOrManager, createSupplier);
+router.put("/:id", verifyAdminOrManager, updateSupplier);
+router.delete("/trash/empty", verifyAdminOrManager, emptySupplierTrash);
+router.delete("/:id", verifyAdminOrManager, trashSupplier);
+router.patch("/:id/restore", verifyAdminOrManager, restoreSupplier);
+router.delete("/:id/permanent", verifyAdminOrManager, deleteSupplier);
 
 export { router as supplierRoutes };

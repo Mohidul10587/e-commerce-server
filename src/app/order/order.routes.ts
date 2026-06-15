@@ -7,12 +7,11 @@ import {
   bulkTrashOrders, bulkRestoreOrders, bulkUpdateOrderStatus,
   getOrderStatusCounts, getOrderPayments, deleteOrderPayment, updateOrderPaymentTx,
 } from "./order.controller";
-import { verifyUser } from "../../middleware/auth";
+import { verifyAdminManagerOrSupport } from "../../middleware/auth";
 
 export const orderRoutes = Router();
 
-// All order routes require authentication
-orderRoutes.use(verifyUser);
+orderRoutes.use(verifyAdminManagerOrSupport);
 
 // Bulk routes (must be before /:id)
 orderRoutes.post("/bulk/trash", bulkTrashOrders);

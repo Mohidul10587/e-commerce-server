@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { getFinancialLog, getPurchaseCostReport } from "./finance.controller";
-import { verifyAdmin } from "../../middleware/auth";
+import { verifyAdminOrManager } from "../../middleware/auth";
 
 const router = Router();
 
-router.get("/log", verifyAdmin, getFinancialLog);
-router.get("/purchase-cost", verifyAdmin, getPurchaseCostReport);
+router.get("/log", verifyAdminOrManager, getFinancialLog);
+router.get("/purchase-cost", verifyAdminOrManager, getPurchaseCostReport);
 
 export { router as financeRoutes };

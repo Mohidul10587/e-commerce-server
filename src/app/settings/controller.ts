@@ -4,6 +4,19 @@ import prisma from "../../lib/prisma";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
+function requireAdminOrManager(req: Request, res: Response): boolean {
+  try {
+    const token = req.cookies.token;
+    if (!token) { res.status(401).json({ message: "Unauthorized" }); return false; }
+    const decoded = jwt.verify(token, JWT_SECRET) as { role: string };
+    if (decoded.role !== "admin" && decoded.role !== "manager") { res.status(403).json({ message: "Access required" }); return false; }
+    return true;
+  } catch {
+    res.status(401).json({ message: "Token expired" });
+    return false;
+  }
+}
+
 function requireAdmin(req: Request, res: Response): boolean {
   try {
     const token = req.cookies.token;
@@ -32,7 +45,7 @@ export async function getSettings(_req: Request, res: Response) {
 }
 
 export async function updateSettings(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+  if (!requireAdminOrManager(req, res)) return;
   try {
     const s = await getOrCreateSettings();
     const { banners: _, ...data } = req.body; // banners managed separately

@@ -6,14 +6,14 @@ import {
   getMonthlyChartData,
   getStockMovementByDateRange,
 } from "./inventory.controller";
-import { verifyAdmin } from "../../middleware/auth";
+import { verifyAdminOrManager } from "../../middleware/auth";
 
 const router = Router();
 
-router.get("/stats", verifyAdmin, getInventoryStats);
-router.get("/stock", verifyAdmin, getStockList);
-router.get("/chart", verifyAdmin, getMonthlyChartData);
-router.get("/movement", verifyAdmin, getStockMovementByDateRange);
-router.patch("/variant/:id", verifyAdmin, updateVariantInline);
+router.get("/stats", verifyAdminOrManager, getInventoryStats);
+router.get("/stock", verifyAdminOrManager, getStockList);
+router.get("/chart", verifyAdminOrManager, getMonthlyChartData);
+router.get("/movement", verifyAdminOrManager, getStockMovementByDateRange);
+router.patch("/variant/:id", verifyAdminOrManager, updateVariantInline);
 
 export { router as inventoryRoutes };

@@ -4,7 +4,7 @@ import {
   getUsers, createUser, updateUser,
   moveUserToTrash, restoreUser, permanentDeleteUser, emptyUserTrash,
 } from "./controller";
-import { verifyUser, verifyAdmin } from "../../middleware/auth";
+import { verifyUser, verifyAdmin, verifyAdminOrManager } from "../../middleware/auth";
 
 const router = Router();
 
@@ -15,8 +15,8 @@ router.post("/refresh", refresh);
 router.post("/logout", logout);
 router.put("/change-password", verifyUser, changePassword);
 
-// Admin user management
-router.get("/", verifyAdmin, getUsers);
+// Manager can view & create/update users, but NOT remove admins (admin-only for delete/restore)
+router.get("/", verifyAdminOrManager, getUsers);
 router.post("/", verifyAdmin, createUser);
 router.put("/:id", verifyAdmin, updateUser);
 router.delete("/trash/empty", verifyAdmin, emptyUserTrash);

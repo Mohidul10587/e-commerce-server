@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { verifyAdmin } from "../../middleware/auth";
+import { verifyAdminOrManager } from "../../middleware/auth";
 import {
   getEmployees,
   listPayrolls,
@@ -14,14 +14,14 @@ import {
 
 const router = Router();
 
-router.get("/employees", verifyAdmin, getEmployees);
-router.get("/summary", verifyAdmin, getPayrollSummary);
-router.get("/", verifyAdmin, listPayrolls);
-router.post("/", verifyAdmin, createPayroll);
-router.put("/:id", verifyAdmin, updatePayroll);
-router.patch("/:id/pay", verifyAdmin, markAsPaid);
-router.delete("/:id", verifyAdmin, trashPayroll);
-router.patch("/:id/restore", verifyAdmin, restorePayroll);
-router.delete("/:id/permanent", verifyAdmin, permanentDeletePayroll);
+router.get("/employees", verifyAdminOrManager, getEmployees);
+router.get("/summary", verifyAdminOrManager, getPayrollSummary);
+router.get("/", verifyAdminOrManager, listPayrolls);
+router.post("/", verifyAdminOrManager, createPayroll);
+router.put("/:id", verifyAdminOrManager, updatePayroll);
+router.patch("/:id/pay", verifyAdminOrManager, markAsPaid);
+router.delete("/:id", verifyAdminOrManager, trashPayroll);
+router.patch("/:id/restore", verifyAdminOrManager, restorePayroll);
+router.delete("/:id/permanent", verifyAdminOrManager, permanentDeletePayroll);
 
 export { router as payrollRoutes };
