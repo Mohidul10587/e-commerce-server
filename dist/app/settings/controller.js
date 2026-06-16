@@ -30,6 +30,25 @@ exports.deleteBanner = deleteBanner;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../../lib/prisma"));
 const JWT_SECRET = process.env.JWT_SECRET;
+function requireAdminOrManager(req, res) {
+    try {
+        const token = req.cookies.token;
+        if (!token) {
+            res.status(401).json({ message: "Unauthorized" });
+            return false;
+        }
+        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        if (decoded.role !== "admin" && decoded.role !== "manager") {
+            res.status(403).json({ message: "Access required" });
+            return false;
+        }
+        return true;
+    }
+    catch (_a) {
+        res.status(401).json({ message: "Token expired" });
+        return false;
+    }
+}
 function requireAdmin(req, res) {
     try {
         const token = req.cookies.token;
@@ -69,7 +88,7 @@ function getSettings(_req, res) {
 }
 function updateSettings(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (!requireAdmin(req, res))
+        if (!requireAdminOrManager(req, res))
             return;
         try {
             const s = yield getOrCreateSettings();

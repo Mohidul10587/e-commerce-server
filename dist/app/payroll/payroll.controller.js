@@ -70,6 +70,15 @@ function listPayrolls(req, res) {
                 where.salaryMonth = { startsWith: year };
             else if (month)
                 where.salaryMonth = { endsWith: `-${month.padStart(2, "0")}` };
+            const startDate = req.query.startDate;
+            const endDate = req.query.endDate;
+            if (startDate || endDate) {
+                where.createdAt = {};
+                if (startDate)
+                    where.createdAt.gte = new Date(startDate);
+                if (endDate)
+                    where.createdAt.lte = new Date(endDate + "T23:59:59.999Z");
+            }
             const [payrolls, total] = yield Promise.all([
                 prisma_1.default.payroll.findMany({
                     where,

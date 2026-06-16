@@ -7,6 +7,7 @@ const auth_1 = require("../../middleware/auth");
 const router = (0, express_1.Router)();
 exports.settingsRoutes = router;
 router.get("/", controller_1.getSettings);
-router.put("/", auth_1.verifyAdmin, controller_1.updateSettings);
+// Manager can update settings (payment methods, system, links) but not general settings (banners controlled via admin only)
+router.put("/", auth_1.verifyAdminOrManager, controller_1.updateSettings);
 router.post("/banners", auth_1.verifyAdmin, controller_1.addBanner);
 router.delete("/banners/:id", auth_1.verifyAdmin, controller_1.deleteBanner);

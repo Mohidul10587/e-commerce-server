@@ -5,8 +5,7 @@ const express_1 = require("express");
 const order_controller_1 = require("./order.controller");
 const auth_1 = require("../../middleware/auth");
 exports.orderRoutes = (0, express_1.Router)();
-// All order routes require authentication
-exports.orderRoutes.use(auth_1.verifyUser);
+exports.orderRoutes.use(auth_1.verifyAdminManagerOrSupport);
 // Bulk routes (must be before /:id)
 exports.orderRoutes.post("/bulk/trash", order_controller_1.bulkTrashOrders);
 exports.orderRoutes.post("/bulk/restore", order_controller_1.bulkRestoreOrders);
@@ -22,6 +21,9 @@ exports.orderRoutes.get("/", order_controller_1.getOrders);
 exports.orderRoutes.get("/:id", order_controller_1.getOrderById);
 exports.orderRoutes.patch("/:id/status", order_controller_1.updateOrderStatus);
 exports.orderRoutes.patch("/:id/payment", order_controller_1.updateOrderPayment);
+exports.orderRoutes.get("/:id/payments", order_controller_1.getOrderPayments);
+exports.orderRoutes.patch("/:id/payments/:txId", order_controller_1.updateOrderPaymentTx);
+exports.orderRoutes.delete("/:id/payments/:txId", order_controller_1.deleteOrderPayment);
 exports.orderRoutes.patch("/:id/discount", order_controller_1.updateOrderDiscount);
 exports.orderRoutes.post("/:id/items", order_controller_1.addOrderItem);
 exports.orderRoutes.put("/:id", order_controller_1.updateOrder);

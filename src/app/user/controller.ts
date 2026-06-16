@@ -6,11 +6,10 @@ import prisma from "../../lib/prisma";
 const JWT_SECRET = process.env.JWT_SECRET!;
 if (!JWT_SECRET) throw new Error("JWT_SECRET env variable is required");
 
-const IS_PROD = process.env.NODE_ENV === "production";
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: IS_PROD,
-  sameSite: (IS_PROD ? "none" : "lax") as "none" | "lax",
+  secure: true,
+  sameSite: "none" as const,
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 

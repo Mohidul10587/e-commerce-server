@@ -12,17 +12,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyAdmin = exports.verifyUserInactive = exports.verifyUser = void 0;
+exports.verifyAdminManagerOrSupport = exports.verifyAdminOrManager = exports.verifyAdmin = exports.verifyUserInactive = exports.verifyUser = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../lib/prisma"));
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET)
     throw new Error("JWT_SECRET env variable is required");
-const IS_PROD = process.env.NODE_ENV === "production";
 const COOKIE_OPTIONS = {
     httpOnly: true,
-    secure: IS_PROD,
-    sameSite: (IS_PROD ? "none" : "lax"),
+    secure: true,
+    sameSite: "none",
 };
 /** Clears the token cookie and returns a standardised session-expired response. */
 function sessionExpired(res) {
@@ -99,3 +98,41 @@ const verifyAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.verifyAdmin = verifyAdmin;
+const verifyAdminOrManager = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const token = req.cookies.token;
+        if (!token)
+            return sessionExpired(res);
+        const user = yield getUserFromToken(req);
+        if (!user)
+            return sessionExpired(res);
+        if (user.role !== "admin" && user.role !== "manager")
+            return res.status(403).json({ message: "Access required" });
+        // @ts-ignore
+        req.user = user;
+        next();
+    }
+    catch (_a) {
+        return sessionExpired(res);
+    }
+});
+exports.verifyAdminOrManager = verifyAdminOrManager;
+const verifyAdminManagerOrSupport = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const token = req.cookies.token;
+        if (!token)
+            return sessionExpired(res);
+        const user = yield getUserFromToken(req);
+        if (!user)
+            return sessionExpired(res);
+        if (user.role !== "admin" && user.role !== "manager" && user.role !== "support")
+            return res.status(403).json({ message: "Access required" });
+        // @ts-ignore
+        req.user = user;
+        next();
+    }
+    catch (_a) {
+        return sessionExpired(res);
+    }
+});
+exports.verifyAdminManagerOrSupport = verifyAdminManagerOrSupport;

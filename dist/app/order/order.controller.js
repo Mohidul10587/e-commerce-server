@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
+exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
 const VALID_STATUSES = [
@@ -61,7 +61,7 @@ const getOrderStatusCounts = (_req, res) => __awaiter(void 0, void 0, void 0, fu
 exports.getOrderStatusCounts = getOrderStatusCounts;
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { customerName, customerPhone, alternativePhone, address, items, deliveryCharge, note, discount, discountPercent, status, } = req.body;
+        const { customerName, customerPhone, alternativePhone, address, contactLink, items, deliveryCharge, note, discount, discountPercent, status, } = req.body;
         if (!customerName || !customerPhone || !address || !(items === null || items === void 0 ? void 0 : items.length))
             return res.status(400).json({ message: "Missing required fields" });
         let subtotal = 0;
@@ -96,6 +96,7 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 customerPhone,
                 alternativePhone: alternativePhone || null,
                 address,
+                contactLink: contactLink || null,
                 subtotal,
                 deliveryCharge: charge,
                 total: subtotal + charge - disc,
@@ -244,7 +245,7 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     var _a;
     try {
         const id = Number(req.params.id);
-        const { customerName, customerPhone, alternativePhone, address, status, discount, discountPercent, paidAmount, items, } = req.body;
+        const { customerName, customerPhone, alternativePhone, address, contactLink, status, discount, discountPercent, paidAmount, items, note, } = req.body;
         const data = {};
         if (customerName)
             data.customerName = customerName;
@@ -254,6 +255,10 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             data.alternativePhone = alternativePhone || null;
         if (address)
             data.address = address;
+        if (contactLink !== undefined)
+            data.contactLink = contactLink || null;
+        if (note !== undefined)
+            data.note = note || null;
         if (status)
             data.status = status;
         // Replace items if provided
@@ -594,6 +599,77 @@ const updateOrderDiscount = (req, res) => __awaiter(void 0, void 0, void 0, func
     }
 });
 exports.updateOrderDiscount = updateOrderDiscount;
+const getOrderPayments = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const transactions = yield prisma_1.prisma.paymentTransaction.findMany({
+            where: { orderId: Number(req.params.id) },
+            orderBy: { createdAt: "asc" },
+        });
+        return res.json({ transactions });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.getOrderPayments = getOrderPayments;
+const deleteOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    try {
+        const txId = Number(req.params.txId);
+        const tx = yield prisma_1.prisma.paymentTransaction.findUnique({ where: { id: txId } });
+        if (!tx)
+            return res.status(404).json({ message: "Transaction not found" });
+        yield prisma_1.prisma.paymentTransaction.delete({ where: { id: txId } });
+        // Recalculate paidAmount from remaining transactions
+        const agg = yield prisma_1.prisma.paymentTransaction.aggregate({
+            where: { orderId: tx.orderId },
+            _sum: { amount: true },
+        });
+        const newPaid = (_a = agg._sum.amount) !== null && _a !== void 0 ? _a : 0;
+        const order = yield prisma_1.prisma.order.findUnique({ where: { id: tx.orderId }, select: { total: true } });
+        const paymentStatus = newPaid <= 0 ? "unpaid" : newPaid >= ((_b = order === null || order === void 0 ? void 0 : order.total) !== null && _b !== void 0 ? _b : 0) ? "paid" : "partial";
+        yield prisma_1.prisma.order.update({ where: { id: tx.orderId }, data: { paidAmount: newPaid, paymentStatus } });
+        index_1.io.emit("order:updated", { id: tx.orderId });
+        return res.json({ message: "Payment deleted" });
+    }
+    catch (_c) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.deleteOrderPayment = deleteOrderPayment;
+const updateOrderPaymentTx = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    try {
+        const txId = Number(req.params.txId);
+        const { amount, source, trxId, note } = req.body;
+        const tx = yield prisma_1.prisma.paymentTransaction.findUnique({ where: { id: txId } });
+        if (!tx)
+            return res.status(404).json({ message: "Transaction not found" });
+        yield prisma_1.prisma.paymentTransaction.update({
+            where: { id: txId },
+            data: {
+                amount: amount !== undefined ? Number(amount) : tx.amount,
+                source: source !== undefined ? source || null : tx.source,
+                trxId: trxId !== undefined ? trxId || null : tx.trxId,
+                note: note !== undefined ? note || null : tx.note,
+            },
+        });
+        const agg = yield prisma_1.prisma.paymentTransaction.aggregate({
+            where: { orderId: tx.orderId },
+            _sum: { amount: true },
+        });
+        const newPaid = (_a = agg._sum.amount) !== null && _a !== void 0 ? _a : 0;
+        const order = yield prisma_1.prisma.order.findUnique({ where: { id: tx.orderId }, select: { total: true } });
+        const paymentStatus = newPaid <= 0 ? "unpaid" : newPaid >= ((_b = order === null || order === void 0 ? void 0 : order.total) !== null && _b !== void 0 ? _b : 0) ? "paid" : "partial";
+        yield prisma_1.prisma.order.update({ where: { id: tx.orderId }, data: { paidAmount: newPaid, paymentStatus } });
+        index_1.io.emit("order:updated", { id: tx.orderId });
+        return res.json({ message: "Payment updated" });
+    }
+    catch (_c) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.updateOrderPaymentTx = updateOrderPaymentTx;
 const updateOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const id = Number(req.params.id);

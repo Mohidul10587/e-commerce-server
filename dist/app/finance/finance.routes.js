@@ -6,4 +6,5 @@ const finance_controller_1 = require("./finance.controller");
 const auth_1 = require("../../middleware/auth");
 const router = (0, express_1.Router)();
 exports.financeRoutes = router;
-router.get("/log", auth_1.verifyAdmin, finance_controller_1.getFinancialLog);
+router.get("/log", auth_1.verifyAdminOrManager, finance_controller_1.getFinancialLog);
+router.get("/purchase-cost", auth_1.verifyAdminOrManager, finance_controller_1.getPurchaseCostReport);
