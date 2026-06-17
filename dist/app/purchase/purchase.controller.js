@@ -97,7 +97,7 @@ function createPurchase(req, res) {
                 const created = yield tx.purchase.create({
                     data: {
                         supplierId: supplierId || null,
-                        date: new Date(date),
+                        date: new Date(date.slice(0, 10)),
                         status,
                         note,
                         totalAmount,
@@ -159,7 +159,7 @@ function updatePurchase(req, res) {
                     where: { id },
                     data: {
                         supplierId: supplierId || null,
-                        date: new Date(date),
+                        date: new Date(date.slice(0, 10)),
                         status,
                         note,
                         totalAmount,

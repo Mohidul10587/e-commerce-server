@@ -39,6 +39,7 @@ exports.trashMarketingExpense = trashMarketingExpense;
 exports.restoreMarketingExpense = restoreMarketingExpense;
 exports.permanentDeleteMarketingExpense = permanentDeleteMarketingExpense;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
+const dateRange_1 = require("../../lib/dateRange");
 function logActivity(action, entity, entityId, note, amount) {
     return __awaiter(this, void 0, void 0, function* () {
         yield prisma_1.default.financialActivityLog.create({ data: { action, entity, entityId, note, amount } });
@@ -313,8 +314,6 @@ function listOfficeExpenses(req, res) {
             const search = req.query.search || "";
             const trash = req.query.trash === "true";
             const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : undefined;
-            const dateFrom = req.query.dateFrom;
-            const dateTo = req.query.dateTo;
             const amountMin = req.query.amountMin ? parseFloat(req.query.amountMin) : undefined;
             const amountMax = req.query.amountMax ? parseFloat(req.query.amountMax) : undefined;
             const where = { isTrashed: trash };
@@ -327,13 +326,10 @@ function listOfficeExpenses(req, res) {
                 if (amountMax !== undefined)
                     where.amount.lte = amountMax;
             }
-            if (dateFrom || dateTo) {
-                where.createdAt = {};
-                if (dateFrom)
-                    where.createdAt.gte = new Date(dateFrom);
-                if (dateTo)
-                    where.createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
-            }
+            const tzOffset = parseInt(req.query.tzOffset) || 0;
+            const dateFilter = (0, dateRange_1.buildDateFilter)((req.query.startDate || req.query.dateFrom), (req.query.endDate || req.query.dateTo), tzOffset);
+            if (dateFilter)
+                where.createdAt = dateFilter;
             if (search)
                 where.OR = [
                     { note: { contains: search, mode: "insensitive" } },
@@ -359,15 +355,18 @@ function listOfficeExpenses(req, res) {
 function createOfficeExpense(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { categoryId, note, amount } = req.body;
+            const { categoryId, note, amount, date, tzOffset } = req.body;
             if (!categoryId)
                 return res.status(400).json({ message: "Category is required" });
             if (!(note === null || note === void 0 ? void 0 : note.trim()))
                 return res.status(400).json({ message: "Note is required" });
             if (!amount || amount <= 0)
                 return res.status(400).json({ message: "Amount must be greater than 0" });
+            const createdAt = date
+                ? (date.includes("T") ? new Date(date) : (0, dateRange_1.localDayRange)(date, parseInt(tzOffset) || 0).gte)
+                : undefined;
             const expense = yield prisma_1.default.officeExpense.create({
-                data: { categoryId: parseInt(categoryId), note: note.trim(), amount: parseFloat(amount) },
+                data: Object.assign({ categoryId: parseInt(categoryId), note: note.trim(), amount: parseFloat(amount) }, (createdAt ? { createdAt, updatedAt: createdAt } : {})),
                 include: { category: { select: { id: true, name: true } } },
             });
             yield logActivity("CREATE", "OfficeExpense", expense.id, note.trim(), parseFloat(amount));
@@ -450,8 +449,8 @@ function listMarketingExpenses(req, res) {
             const search = req.query.search || "";
             const trash = req.query.trash === "true";
             const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : undefined;
-            const dateFrom = req.query.dateFrom;
-            const dateTo = req.query.dateTo;
+            const dateFrom = (req.query.startDate || req.query.dateFrom);
+            const dateTo = (req.query.endDate || req.query.dateTo);
             const amountMin = req.query.amountMin ? parseFloat(req.query.amountMin) : undefined;
             const amountMax = req.query.amountMax ? parseFloat(req.query.amountMax) : undefined;
             const where = { isTrashed: trash };
@@ -464,13 +463,10 @@ function listMarketingExpenses(req, res) {
                 if (amountMax !== undefined)
                     where.amount.lte = amountMax;
             }
-            if (dateFrom || dateTo) {
-                where.createdAt = {};
-                if (dateFrom)
-                    where.createdAt.gte = new Date(dateFrom);
-                if (dateTo)
-                    where.createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
-            }
+            const tzOffset = parseInt(req.query.tzOffset) || 0;
+            const dateFilter = (0, dateRange_1.buildDateFilter)(dateFrom, dateTo, tzOffset);
+            if (dateFilter)
+                where.createdAt = dateFilter;
             if (search)
                 where.OR = [
                     { note: { contains: search, mode: "insensitive" } },

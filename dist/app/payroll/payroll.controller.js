@@ -22,6 +22,7 @@ exports.restorePayroll = restorePayroll;
 exports.permanentDeletePayroll = permanentDeletePayroll;
 exports.getPayrollSummary = getPayrollSummary;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
+const dateRange_1 = require("../../lib/dateRange");
 const EMPLOYEE_ROLES = { not: "customer" };
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function logFinancial(entityId, amount, note) {
@@ -72,13 +73,10 @@ function listPayrolls(req, res) {
                 where.salaryMonth = { endsWith: `-${month.padStart(2, "0")}` };
             const startDate = req.query.startDate;
             const endDate = req.query.endDate;
-            if (startDate || endDate) {
-                where.createdAt = {};
-                if (startDate)
-                    where.createdAt.gte = new Date(startDate);
-                if (endDate)
-                    where.createdAt.lte = new Date(endDate + "T23:59:59.999Z");
-            }
+            const tzOffset = parseInt(req.query.tzOffset) || 0;
+            const dateFilter = (0, dateRange_1.buildDateFilter)(startDate, endDate, tzOffset);
+            if (dateFilter)
+                where.createdAt = dateFilter;
             const [payrolls, total] = yield Promise.all([
                 prisma_1.default.payroll.findMany({
                     where,

@@ -109,22 +109,25 @@ function getFinancialLog(req, res) {
             const officeExpenseCost = entries.filter(e => e.id.startsWith("office-")).reduce((s, e) => s + e.amount, 0);
             const marketingExpenseCost = entries.filter(e => e.id.startsWith("marketing-")).reduce((s, e) => s + e.amount, 0);
             const salaryCost = entries.filter(e => e.id.startsWith("payroll-")).reduce((s, e) => s + e.amount, 0);
-            // COGS: purchasePrice × qty for all delivered order items (all-time, matches Purchase Cost page)
-            const deliveredItems = yield prisma_1.prisma.orderItem.findMany({
-                where: { order: { isTrashed: false, status: "Delivered" }, isFreeItem: false },
-                select: { variantId: true, quantity: true },
+            // Purchase cost: sum of purchaseMoney paid to suppliers for received purchases within date range
+            const purchases = yield prisma_1.prisma.purchase.findMany({
+                where: { isTrashed: false, status: "Received", date: { gte: start, lte: end } },
+                select: { purchaseMoney: true },
             });
-            const variantIds = [...new Set(deliveredItems.map(i => i.variantId))];
-            const variants = variantIds.length ? yield prisma_1.prisma.productVariant.findMany({
-                where: { id: { in: variantIds } },
-                select: { id: true, purchasePrice: true },
-            }) : [];
-            const priceMap = Object.fromEntries(variants.map(v => { var _a; return [v.id, (_a = v.purchasePrice) !== null && _a !== void 0 ? _a : 0]; }));
-            const purchaseCost = deliveredItems.reduce((s, i) => { var _a; return s + ((_a = priceMap[i.variantId]) !== null && _a !== void 0 ? _a : 0) * i.quantity; }, 0);
+            const purchaseCost = purchases.reduce((s, p) => { var _a; return s + ((_a = p.purchaseMoney) !== null && _a !== void 0 ? _a : 0); }, 0);
             return res.json({
                 start: start.toISOString(),
                 end: end.toISOString(),
-                summary: { totalIncome, totalExpense, netProfit: totalIncome - totalExpense, purchaseCost, officeExpenseCost, marketingExpenseCost, salaryCost },
+                summary: {
+                    totalIncome,
+                    totalExpense: totalExpense + purchaseCost,
+                    netProfit: totalIncome - totalExpense - purchaseCost,
+                    purchaseCost,
+                    officeExpenseCost,
+                    marketingExpenseCost,
+                    salaryCost,
+                    paymentTransactionCount: entries.filter(e => e.type === "income").length,
+                },
                 entries,
             });
         }
@@ -134,54 +137,46 @@ function getFinancialLog(req, res) {
         }
     });
 }
-function getPurchaseCostReport(_req, res) {
+function getPurchaseCostReport(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a;
         try {
-            // Get all items from Delivered orders (not trashed)
-            const items = yield prisma_1.prisma.orderItem.findMany({
-                where: {
-                    order: { isTrashed: false, status: "Delivered" },
-                    isFreeItem: false,
-                },
-                select: {
-                    variantId: true,
-                    title: true,
-                    quantity: true,
-                },
-            });
-            // Get purchase prices for all variants involved
-            const variantIds = [...new Set(items.map((i) => i.variantId))];
-            const variants = yield prisma_1.prisma.productVariant.findMany({
-                where: { id: { in: variantIds } },
-                select: { id: true, purchasePrice: true },
-            });
-            const priceMap = Object.fromEntries(variants.map((v) => [v.id, v.purchasePrice]));
-            // Aggregate by variantId + title
-            const map = new Map();
-            for (const item of items) {
-                const existing = map.get(item.variantId);
-                const pp = (_a = priceMap[item.variantId]) !== null && _a !== void 0 ? _a : 0;
-                if (existing) {
-                    existing.qty += item.quantity;
-                }
-                else {
-                    map.set(item.variantId, { title: item.title, qty: item.quantity, purchasePrice: pp });
-                }
+            const tzOffset = parseInt(req.query.tzOffset) || 0;
+            const startDateParam = req.query.startDate;
+            const endDateParam = req.query.endDate;
+            const dateFilter = {};
+            if (startDateParam && endDateParam) {
+                const [sy, sm, sd] = startDateParam.split("-").map(Number);
+                const [ey, em, ed] = endDateParam.split("-").map(Number);
+                dateFilter.gte = new Date(Date.UTC(sy, sm - 1, sd, 0, 0, 0) + tzOffset * 60 * 1000);
+                dateFilter.lte = new Date(Date.UTC(ey, em - 1, ed, 23, 59, 59, 999) + tzOffset * 60 * 1000);
             }
-            const rows = [...map.entries()]
-                .map(([variantId, d], i) => ({
-                variantId,
-                title: d.title,
-                totalQty: d.qty,
-                purchasePricePerUnit: d.purchasePrice,
-                totalPurchaseCost: d.qty * d.purchasePrice,
-            }))
-                .sort((a, b) => b.totalPurchaseCost - a.totalPurchaseCost)
-                .map((r, i) => (Object.assign(Object.assign({}, r), { rank: i + 1 })));
-            const top10 = rows.slice(0, 10);
-            const grandTotal = rows.reduce((s, r) => s + r.totalPurchaseCost, 0);
-            return res.json({ rows, top10, grandTotal, total: rows.length });
+            const purchaseWhere = Object.assign({ isTrashed: false, status: "Received" }, (dateFilter.gte ? { date: dateFilter } : {}));
+            const purchases = yield prisma_1.prisma.purchase.findMany({
+                where: purchaseWhere,
+                select: {
+                    id: true,
+                    date: true,
+                    purchaseMoney: true,
+                    totalAmount: true,
+                    supplier: { select: { name: true } },
+                    items: { select: { productTitle: true, variantTitle: true, quantity: true, purchasePrice: true } },
+                },
+                orderBy: { date: "desc" },
+            });
+            const rows = purchases.map((p, i) => {
+                var _a, _b, _c;
+                return ({
+                    rank: i + 1,
+                    purchaseId: p.id,
+                    date: p.date,
+                    supplier: (_b = (_a = p.supplier) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : "—",
+                    itemSummary: p.items.map(it => `${it.productTitle} - ${it.variantTitle} (×${it.quantity})`).join(", "),
+                    totalAmount: p.totalAmount,
+                    purchaseMoney: (_c = p.purchaseMoney) !== null && _c !== void 0 ? _c : 0,
+                });
+            });
+            const grandTotal = rows.reduce((s, r) => s + r.purchaseMoney, 0);
+            return res.json({ rows, grandTotal, total: rows.length });
         }
         catch (err) {
             console.error(err);

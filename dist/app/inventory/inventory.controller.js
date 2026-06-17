@@ -18,6 +18,7 @@ exports.updateVariantInline = updateVariantInline;
 exports.getMonthlyChartData = getMonthlyChartData;
 exports.getStockMovementByDateRange = getStockMovementByDateRange;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
+const dateRange_1 = require("../../lib/dateRange");
 const LOW_STOCK_THRESHOLD = 5;
 function getInventoryStats(_req, res) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -284,8 +285,9 @@ function getStockMovementByDateRange(req, res) {
             const { startDate, endDate } = req.query;
             if (!startDate || !endDate)
                 return res.status(400).json({ message: "startDate and endDate are required" });
-            const start = new Date(`${startDate}T00:00:00.000Z`);
-            const end = new Date(`${endDate}T23:59:59.999Z`);
+            const tzOffset = parseInt(req.query.tzOffset) || 0;
+            const { gte: start } = (0, dateRange_1.localDayRange)(startDate, tzOffset);
+            const { lte: end } = (0, dateRange_1.localDayRange)(endDate, tzOffset);
             const [history, orderedPurchases, receivedPurchases] = yield Promise.all([
                 prisma_1.default.stockHistory.findMany({
                     where: { createdAt: { gte: start, lte: end } },
