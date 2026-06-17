@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../../lib/prisma";
+import { buildDateFilter } from "../../lib/dateRange";
 
 const EMPLOYEE_ROLES = { not: "customer" } as const;
 
@@ -48,11 +49,9 @@ export async function listPayrolls(req: Request, res: Response) {
 
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
-      if (endDate) where.createdAt.lte = new Date(endDate + "T23:59:59.999Z");
-    }
+    const tzOffset = parseInt(req.query.tzOffset as string) || 0;
+    const dateFilter = buildDateFilter(startDate, endDate, tzOffset);
+    if (dateFilter) where.createdAt = dateFilter;
 
     const [payrolls, total] = await Promise.all([
       prisma.payroll.findMany({

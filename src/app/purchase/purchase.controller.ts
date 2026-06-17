@@ -86,7 +86,7 @@ export async function createPurchase(req: Request, res: Response) {
       const created = await tx.purchase.create({
         data: {
           supplierId: supplierId || null,
-          date: new Date(date),
+          date: new Date(date.slice(0, 10)),
           status,
           note,
           totalAmount,
@@ -156,7 +156,7 @@ export async function updatePurchase(req: Request, res: Response) {
         where: { id },
         data: {
           supplierId: supplierId || null,
-          date: new Date(date),
+          date: new Date(date.slice(0, 10)),
           status,
           note,
           totalAmount,

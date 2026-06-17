@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../../lib/prisma";
+import { localDayRange } from "../../lib/dateRange";
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -308,8 +309,9 @@ export async function getStockMovementByDateRange(req: Request, res: Response) {
     if (!startDate || !endDate)
       return res.status(400).json({ message: "startDate and endDate are required" });
 
-    const start = new Date(`${startDate}T00:00:00.000Z`);
-    const end = new Date(`${endDate}T23:59:59.999Z`);
+    const tzOffset = parseInt(req.query.tzOffset as string) || 0;
+    const { gte: start } = localDayRange(startDate as string, tzOffset);
+    const { lte: end } = localDayRange(endDate as string, tzOffset);
 
     const [history, orderedPurchases, receivedPurchases] = await Promise.all([
       prisma.stockHistory.findMany({

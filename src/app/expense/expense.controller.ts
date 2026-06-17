@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../../lib/prisma";
+import { buildDateFilter } from "../../lib/dateRange";
 
 async function logActivity(action: string, entity: string, entityId: number, note?: string, amount?: number) {
   await prisma.financialActivityLog.create({ data: { action, entity, entityId, note, amount } });
@@ -228,8 +229,6 @@ export async function listOfficeExpenses(req: Request, res: Response) {
     const search = (req.query.search as string) || "";
     const trash = req.query.trash === "true";
     const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
-    const dateFrom = req.query.dateFrom as string | undefined;
-    const dateTo = req.query.dateTo as string | undefined;
     const amountMin = req.query.amountMin ? parseFloat(req.query.amountMin as string) : undefined;
     const amountMax = req.query.amountMax ? parseFloat(req.query.amountMax as string) : undefined;
 
@@ -240,11 +239,13 @@ export async function listOfficeExpenses(req: Request, res: Response) {
       if (amountMin !== undefined) where.amount.gte = amountMin;
       if (amountMax !== undefined) where.amount.lte = amountMax;
     }
-    if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
-    }
+    const tzOffset = parseInt(req.query.tzOffset as string) || 0;
+    const dateFilter = buildDateFilter(
+      req.query.dateFrom as string | undefined,
+      req.query.dateTo as string | undefined,
+      tzOffset
+    );
+    if (dateFilter) where.createdAt = dateFilter;
     if (search) where.OR = [
       { note: { contains: search, mode: "insensitive" } },
       { category: { name: { contains: search, mode: "insensitive" } } },
@@ -344,11 +345,9 @@ export async function listMarketingExpenses(req: Request, res: Response) {
       if (amountMin !== undefined) where.amount.gte = amountMin;
       if (amountMax !== undefined) where.amount.lte = amountMax;
     }
-    if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo + "T23:59:59.999Z");
-    }
+    const tzOffset = parseInt(req.query.tzOffset as string) || 0;
+    const dateFilter = buildDateFilter(dateFrom, dateTo, tzOffset);
+    if (dateFilter) where.createdAt = dateFilter;
     if (search) where.OR = [
       { note: { contains: search, mode: "insensitive" } },
       { category: { name: { contains: search, mode: "insensitive" } } },
