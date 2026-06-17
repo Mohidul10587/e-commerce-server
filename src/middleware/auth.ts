@@ -131,3 +131,49 @@ export const verifyAdminManagerOrSupport = async (
     return sessionExpired(res);
   }
 };
+
+/** Admin, Manager, Support, Designer, Production */
+export const verifyAdminManagerSupportDesignerOrProduction = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) return sessionExpired(res);
+
+    const user = await getUserFromToken(req);
+    if (!user) return sessionExpired(res);
+    const allowed = ["admin", "manager", "support", "designer", "production"];
+    if (!allowed.includes(user.role))
+      return res.status(403).json({ message: "Access required" });
+    // @ts-ignore
+    req.user = user;
+    next();
+  } catch {
+    return sessionExpired(res);
+  }
+};
+
+/** Admin, Manager, Support, Production (for inventory) */
+export const verifyAdminManagerSupportOrProduction = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) return sessionExpired(res);
+
+    const user = await getUserFromToken(req);
+    if (!user) return sessionExpired(res);
+    const allowed = ["admin", "manager", "support", "production"];
+    if (!allowed.includes(user.role))
+      return res.status(403).json({ message: "Access required" });
+    // @ts-ignore
+    req.user = user;
+    next();
+  } catch {
+    return sessionExpired(res);
+  }
+};

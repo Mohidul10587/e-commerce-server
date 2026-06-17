@@ -3,7 +3,7 @@ import {
   getPurchases, createPurchase, updatePurchase, updatePurchaseStatus,
   movePurchaseToTrash, restorePurchase, deletePurchase, emptyPurchaseTrash,
 } from "./purchase.controller";
-import { verifyAdminOrManager } from "../../middleware/auth";
+import { verifyAdminOrManager, verifyAdmin } from "../../middleware/auth";
 
 const router = Router();
 
@@ -12,8 +12,8 @@ router.post("/", verifyAdminOrManager, createPurchase);
 router.put("/:id", verifyAdminOrManager, updatePurchase);
 router.patch("/:id/status", verifyAdminOrManager, updatePurchaseStatus);
 router.patch("/:id/restore", verifyAdminOrManager, restorePurchase);
-router.delete("/trash/empty", verifyAdminOrManager, emptyPurchaseTrash);
+router.delete("/trash/empty", verifyAdmin, emptyPurchaseTrash);
 router.delete("/:id", verifyAdminOrManager, movePurchaseToTrash);
-router.delete("/:id/permanent", verifyAdminOrManager, deletePurchase);
+router.delete("/:id/permanent", verifyAdmin, deletePurchase);
 
 export { router as purchaseRoutes };
