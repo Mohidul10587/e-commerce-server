@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../../lib/prisma";
-import { buildDateFilter } from "../../lib/dateRange";
+import { buildDateFilter, localDayRange } from "../../lib/dateRange";
 
 async function logActivity(action: string, entity: string, entityId: number, note?: string, amount?: number) {
   await prisma.financialActivityLog.create({ data: { action, entity, entityId, note, amount } });
@@ -241,8 +241,8 @@ export async function listOfficeExpenses(req: Request, res: Response) {
     }
     const tzOffset = parseInt(req.query.tzOffset as string) || 0;
     const dateFilter = buildDateFilter(
-      req.query.dateFrom as string | undefined,
-      req.query.dateTo as string | undefined,
+      (req.query.startDate || req.query.dateFrom) as string | undefined,
+      (req.query.endDate || req.query.dateTo) as string | undefined,
       tzOffset
     );
     if (dateFilter) where.createdAt = dateFilter;
@@ -267,12 +267,15 @@ export async function listOfficeExpenses(req: Request, res: Response) {
 
 export async function createOfficeExpense(req: Request, res: Response) {
   try {
-    const { categoryId, note, amount } = req.body;
+    const { categoryId, note, amount, date, tzOffset } = req.body;
     if (!categoryId) return res.status(400).json({ message: "Category is required" });
     if (!note?.trim()) return res.status(400).json({ message: "Note is required" });
     if (!amount || amount <= 0) return res.status(400).json({ message: "Amount must be greater than 0" });
+    const createdAt = date
+      ? (date.includes("T") ? new Date(date) : localDayRange(date, parseInt(tzOffset) || 0).gte)
+      : undefined;
     const expense = await prisma.officeExpense.create({
-      data: { categoryId: parseInt(categoryId), note: note.trim(), amount: parseFloat(amount) },
+      data: { categoryId: parseInt(categoryId), note: note.trim(), amount: parseFloat(amount), ...(createdAt ? { createdAt, updatedAt: createdAt } : {}) },
       include: { category: { select: { id: true, name: true } } },
     });
     await logActivity("CREATE", "OfficeExpense", expense.id, note.trim(), parseFloat(amount));
@@ -333,8 +336,8 @@ export async function listMarketingExpenses(req: Request, res: Response) {
     const search = (req.query.search as string) || "";
     const trash = req.query.trash === "true";
     const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
-    const dateFrom = req.query.dateFrom as string | undefined;
-    const dateTo = req.query.dateTo as string | undefined;
+    const dateFrom = (req.query.startDate || req.query.dateFrom) as string | undefined;
+    const dateTo = (req.query.endDate || req.query.dateTo) as string | undefined;
     const amountMin = req.query.amountMin ? parseFloat(req.query.amountMin as string) : undefined;
     const amountMax = req.query.amountMax ? parseFloat(req.query.amountMax as string) : undefined;
 
