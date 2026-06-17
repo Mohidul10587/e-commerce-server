@@ -23,8 +23,8 @@ function signToken(user: { id: number; phone: string; role: string }) {
   return jwt.sign({ id: user.id, phone: user.phone, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
 }
 
-function safeUser(user: { id: number; name: string; phone: string; role: string; isTrashed: boolean; image: string | null }) {
-  return { id: user.id, name: user.name, phone: user.phone, role: user.role, isTrashed: user.isTrashed, image: user.image };
+function safeUser(user: { id: number; name: string; phone: string; role: string; isTrashed: boolean; image: string | null; basicSalary: number; overtime: number; ta: number; bonus: number }) {
+  return { id: user.id, name: user.name, phone: user.phone, role: user.role, isTrashed: user.isTrashed, image: user.image, basicSalary: user.basicSalary, overtime: user.overtime, ta: user.ta, bonus: user.bonus };
 }
 
 function requireAdmin(req: Request, res: Response): { id: number; role: string } | null {
@@ -148,7 +148,7 @@ export async function getUsers(req: Request, res: Response) {
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
-        select: { id: true, name: true, phone: true, role: true, isTrashed: true, image: true, createdAt: true },
+        select: { id: true, name: true, phone: true, role: true, isTrashed: true, image: true, createdAt: true, basicSalary: true, overtime: true, ta: true, bonus: true },
         orderBy: { createdAt: "desc" },
         skip,
         take,
@@ -183,12 +183,16 @@ export async function updateUser(req: Request, res: Response) {
   if (!requireAdmin(req, res)) return;
   try {
     const id = parseInt(req.params.id);
-    const { name, phone, role, password } = req.body;
+    const { name, phone, role, password, basicSalary, overtime, ta, bonus } = req.body;
     const data: any = {};
     if (name) data.name = name;
     if (phone) data.phone = phone;
     if (role) data.role = role;
     if (password) data.password = await bcrypt.hash(password, 10);
+    if (basicSalary !== undefined) data.basicSalary = parseFloat(basicSalary);
+    if (overtime !== undefined) data.overtime = parseFloat(overtime);
+    if (ta !== undefined) data.ta = parseFloat(ta);
+    if (bonus !== undefined) data.bonus = parseFloat(bonus);
 
     const user = await prisma.user.update({ where: { id }, data });
     return res.json({ message: "User updated", user: safeUser(user) });

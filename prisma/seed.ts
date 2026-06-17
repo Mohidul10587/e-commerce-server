@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
@@ -7,9 +7,7 @@ async function main() {
   const hashedPassword = await bcrypt.hash("01700000000", 10);
 
   const admin = await prisma.user.upsert({
-    where: {
-      phone: "01700000000",
-    },
+    where: { phone: "01700000000" },
     update: {},
     create: {
       name: "Admin",
@@ -18,8 +16,26 @@ async function main() {
       role: "admin",
     },
   });
-
   console.log("Admin created:", admin);
+
+  // Seed employees with salary data
+  const employees: { name: string; phone: string; role: Role; basicSalary: number; overtime: number; ta: number; bonus: number }[] = [
+    { name: "Rahim Uddin",   phone: "01711111111", role: "manager",    basicSalary: 35000, overtime: 3000, ta: 2000, bonus: 5000 },
+    { name: "Karim Hossain", phone: "01722222222", role: "designer",   basicSalary: 28000, overtime: 2000, ta: 1500, bonus: 3000 },
+    { name: "Nasrin Akter",  phone: "01733333333", role: "support",    basicSalary: 22000, overtime: 1500, ta: 1000, bonus: 2000 },
+    { name: "Jamal Mia",     phone: "01744444444", role: "production", basicSalary: 20000, overtime: 2500, ta: 1000, bonus: 2000 },
+    { name: "Sohel Rana",    phone: "01755555555", role: "production", basicSalary: 20000, overtime: 2000, ta: 1000, bonus: 1500 },
+  ];
+
+  const empPassword = await bcrypt.hash("123456", 10);
+  for (const emp of employees) {
+    await prisma.user.upsert({
+      where: { phone: emp.phone },
+      update: { basicSalary: emp.basicSalary, overtime: emp.overtime, ta: emp.ta, bonus: emp.bonus },
+      create: { ...emp, password: empPassword },
+    });
+  }
+  console.log("5 employees seeded with salary data.");
 
   const sealProducts = [
     { title: "Round Seal", sizes: ["38mm", "45mm", "50mm"] },
@@ -91,14 +107,9 @@ async function main() {
     });
   }
 
-  console.log("20 products created.");
+  console.log("20 products seeded.");
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });

@@ -31,14 +31,18 @@ enum StockAction {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  phone     String   @unique
-  password  String
-  role      Role     @default(customer)
-  isTrashed Boolean  @default(false)
-  image     String?
-  createdAt DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  name        String
+  phone       String   @unique
+  password    String
+  role        Role     @default(customer)
+  isTrashed   Boolean  @default(false)
+  image       String?
+  basicSalary Float    @default(0)
+  overtime    Float    @default(0)
+  ta          Float    @default(0)
+  bonus       Float    @default(0)
+  createdAt   DateTime @default(now())
 }
 
 model GeneralSettings {

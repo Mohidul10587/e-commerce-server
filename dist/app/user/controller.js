@@ -220,7 +220,7 @@ function updateUser(req, res) {
             return;
         try {
             const id = parseInt(req.params.id);
-            const { name, phone, role, password } = req.body;
+            const { name, phone, role, password, basicSalary, overtime, ta, bonus } = req.body;
             const data = {};
             if (name)
                 data.name = name;
@@ -230,6 +230,14 @@ function updateUser(req, res) {
                 data.role = role;
             if (password)
                 data.password = yield bcrypt_1.default.hash(password, 10);
+            if (basicSalary !== undefined)
+                data.basicSalary = parseFloat(basicSalary);
+            if (overtime !== undefined)
+                data.overtime = parseFloat(overtime);
+            if (ta !== undefined)
+                data.ta = parseFloat(ta);
+            if (bonus !== undefined)
+                data.bonus = parseFloat(bonus);
             const user = yield prisma_1.default.user.update({ where: { id }, data });
             return res.json({ message: "User updated", user: safeUser(user) });
         }

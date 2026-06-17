@@ -14,6 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getEmployees = getEmployees;
 exports.listPayrolls = listPayrolls;
+exports.generatePayrolls = generatePayrolls;
 exports.createPayroll = createPayroll;
 exports.updatePayroll = updatePayroll;
 exports.markAsPaid = markAsPaid;
@@ -38,7 +39,7 @@ function getEmployees(_req, res) {
         try {
             const employees = yield prisma_1.default.user.findMany({
                 where: { role: { not: "customer" }, isTrashed: false },
-                select: { id: true, name: true, role: true },
+                select: { id: true, name: true, role: true, basicSalary: true, overtime: true, ta: true, bonus: true },
                 orderBy: { name: "asc" },
             });
             return res.json({ employees });
@@ -98,6 +99,46 @@ function listPayrolls(req, res) {
             if (role)
                 result = result.filter((p) => { var _a; return ((_a = p.employee) === null || _a === void 0 ? void 0 : _a.role) === role; });
             return res.json({ payrolls: result, total: role ? result.length : total });
+        }
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
+        }
+    });
+}
+function generatePayrolls(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { salaryMonth } = req.body; // "YYYY-MM"
+            if (!salaryMonth || !/^\d{4}-\d{2}$/.test(salaryMonth))
+                return res.status(400).json({ message: "salaryMonth is required in YYYY-MM format" });
+            const employees = yield prisma_1.default.user.findMany({
+                where: { role: { not: "customer" }, isTrashed: false },
+                select: { id: true, basicSalary: true, overtime: true, ta: true, bonus: true },
+            });
+            if (employees.length === 0)
+                return res.status(400).json({ message: "No employees found" });
+            // Skip employees that already have a payroll for this month
+            const existing = yield prisma_1.default.payroll.findMany({
+                where: { salaryMonth, isTrashed: false },
+                select: { employeeId: true },
+            });
+            const existingIds = new Set(existing.map((e) => e.employeeId));
+            const toCreate = employees.filter((e) => !existingIds.has(e.id));
+            if (toCreate.length === 0)
+                return res.status(400).json({ message: "Payroll already generated for all employees this month" });
+            const created = yield prisma_1.default.payroll.createMany({
+                data: toCreate.map((e) => ({
+                    employeeId: e.id,
+                    salaryMonth,
+                    basicSalary: e.basicSalary,
+                    overtime: e.overtime,
+                    ta: e.ta,
+                    bonus: e.bonus,
+                    totalPayable: e.basicSalary + e.overtime + e.ta + e.bonus,
+                    status: "Pending",
+                })),
+            });
+            return res.status(201).json({ generated: created.count, skipped: existingIds.size });
         }
         catch (_a) {
             return res.status(500).json({ message: "Server error" });

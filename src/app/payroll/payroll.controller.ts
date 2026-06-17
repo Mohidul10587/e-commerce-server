@@ -18,7 +18,7 @@ export async function getEmployees(_req: Request, res: Response) {
   try {
     const employees = await prisma.user.findMany({
       where: { role: { not: "customer" }, isTrashed: false },
-      select: { id: true, name: true, role: true },
+      select: { id: true, name: true, role: true, basicSalary: true, overtime: true, ta: true, bonus: true },
       orderBy: { name: "asc" },
     });
     return res.json({ employees });
@@ -81,6 +81,50 @@ export async function listPayrolls(req: Request, res: Response) {
   }
 }
 
+export async function generatePayrolls(req: Request, res: Response) {
+  try {
+    const { salaryMonth } = req.body; // "YYYY-MM"
+    if (!salaryMonth || !/^\d{4}-\d{2}$/.test(salaryMonth))
+      return res.status(400).json({ message: "salaryMonth is required in YYYY-MM format" });
+
+    const employees = await prisma.user.findMany({
+      where: { role: { not: "customer" }, isTrashed: false },
+      select: { id: true, basicSalary: true, overtime: true, ta: true, bonus: true },
+    });
+
+    if (employees.length === 0)
+      return res.status(400).json({ message: "No employees found" });
+
+    // Skip employees that already have a payroll for this month
+    const existing = await prisma.payroll.findMany({
+      where: { salaryMonth, isTrashed: false },
+      select: { employeeId: true },
+    });
+    const existingIds = new Set(existing.map((e) => e.employeeId));
+    const toCreate = employees.filter((e) => !existingIds.has(e.id));
+
+    if (toCreate.length === 0)
+      return res.status(400).json({ message: "Payroll already generated for all employees this month" });
+
+    const created = await prisma.payroll.createMany({
+      data: toCreate.map((e) => ({
+        employeeId: e.id,
+        salaryMonth,
+        basicSalary: e.basicSalary,
+        overtime: e.overtime,
+        ta: e.ta,
+        bonus: e.bonus,
+        totalPayable: e.basicSalary + e.overtime + e.ta + e.bonus,
+        status: "Pending",
+      })),
+    });
+
+    return res.status(201).json({ generated: created.count, skipped: existingIds.size });
+  } catch {
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
 export async function createPayroll(req: Request, res: Response) {
   try {
     const { employeeId, salaryMonth, basicSalary, overtime = 0, ta = 0, bonus = 0, note } = req.body;
@@ -126,6 +170,19 @@ export async function updatePayroll(req: Request, res: Response) {
         totalPayable,
         note: note || null,
       },
+    });
+    return res.json({ payroll });
+  } catch {
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
+export async function revertToPending(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    const payroll = await prisma.payroll.update({
+      where: { id },
+      data: { status: "Pending", paidAt: null },
     });
     return res.json({ payroll });
   } catch {
