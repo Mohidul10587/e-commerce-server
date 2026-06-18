@@ -25,6 +25,7 @@ exports.restoreUser = restoreUser;
 exports.permanentDeleteUser = permanentDeleteUser;
 exports.emptyUserTrash = emptyUserTrash;
 exports.changePassword = changePassword;
+exports.getDesigners = getDesigners;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const prisma_1 = __importDefault(require("../../lib/prisma"));
@@ -46,7 +47,7 @@ function signToken(user) {
     return jsonwebtoken_1.default.sign({ id: user.id, phone: user.phone, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
 }
 function safeUser(user) {
-    return { id: user.id, name: user.name, phone: user.phone, role: user.role, isTrashed: user.isTrashed, image: user.image };
+    return { id: user.id, name: user.name, phone: user.phone, role: user.role, isTrashed: user.isTrashed, image: user.image, basicSalary: user.basicSalary, overtime: user.overtime, ta: user.ta, bonus: user.bonus };
 }
 function requireAdmin(req, res) {
     try {
@@ -180,7 +181,7 @@ function getUsers(req, res) {
             const [users, total] = yield Promise.all([
                 prisma_1.default.user.findMany({
                     where,
-                    select: { id: true, name: true, phone: true, role: true, isTrashed: true, image: true, createdAt: true },
+                    select: { id: true, name: true, phone: true, role: true, isTrashed: true, image: true, createdAt: true, basicSalary: true, overtime: true, ta: true, bonus: true },
                     orderBy: { createdAt: "desc" },
                     skip,
                     take,
@@ -320,6 +321,21 @@ function changePassword(req, res) {
             const hashed = yield bcrypt_1.default.hash(newPassword, 10);
             yield prisma_1.default.user.update({ where: { id: decoded.id }, data: { password: hashed } });
             return res.json({ message: "Password changed successfully" });
+        }
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
+        }
+    });
+}
+function getDesigners(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const designers = yield prisma_1.default.user.findMany({
+                where: { role: "designer", isTrashed: false },
+                select: { id: true, name: true },
+                orderBy: { name: "asc" },
+            });
+            return res.json({ designers });
         }
         catch (_a) {
             return res.status(500).json({ message: "Server error" });

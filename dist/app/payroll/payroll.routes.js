@@ -6,13 +6,16 @@ const auth_1 = require("../../middleware/auth");
 const payroll_controller_1 = require("./payroll.controller");
 const router = (0, express_1.Router)();
 exports.payrollRoutes = router;
+// Manager can read payroll but not edit/delete
 router.get("/employees", auth_1.verifyAdminOrManager, payroll_controller_1.getEmployees);
 router.get("/summary", auth_1.verifyAdminOrManager, payroll_controller_1.getPayrollSummary);
 router.get("/", auth_1.verifyAdminOrManager, payroll_controller_1.listPayrolls);
-router.post("/generate", auth_1.verifyAdminOrManager, payroll_controller_1.generatePayrolls);
-router.post("/", auth_1.verifyAdminOrManager, payroll_controller_1.createPayroll);
-router.put("/:id", auth_1.verifyAdminOrManager, payroll_controller_1.updatePayroll);
-router.patch("/:id/pay", auth_1.verifyAdminOrManager, payroll_controller_1.markAsPaid);
-router.delete("/:id", auth_1.verifyAdminOrManager, payroll_controller_1.trashPayroll);
-router.patch("/:id/restore", auth_1.verifyAdminOrManager, payroll_controller_1.restorePayroll);
-router.delete("/:id/permanent", auth_1.verifyAdminOrManager, payroll_controller_1.permanentDeletePayroll);
+// Write operations: admin only
+router.post("/generate", auth_1.verifyAdmin, payroll_controller_1.generatePayrolls);
+router.post("/", auth_1.verifyAdmin, payroll_controller_1.createPayroll);
+router.put("/:id", auth_1.verifyAdmin, payroll_controller_1.updatePayroll);
+router.patch("/:id/pay", auth_1.verifyAdmin, payroll_controller_1.markAsPaid);
+router.patch("/:id/revert", auth_1.verifyAdmin, payroll_controller_1.revertToPending);
+router.delete("/:id", auth_1.verifyAdmin, payroll_controller_1.trashPayroll);
+router.patch("/:id/restore", auth_1.verifyAdmin, payroll_controller_1.restorePayroll);
+router.delete("/:id/permanent", auth_1.verifyAdmin, payroll_controller_1.permanentDeletePayroll);

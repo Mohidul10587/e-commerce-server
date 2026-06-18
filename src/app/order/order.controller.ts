@@ -147,6 +147,7 @@ export const getOrders = async (req: Request, res: Response) => {
       status,
       payment,
       sort,
+      assignedDesignerId,
     } = req.query;
     const where: any = { isTrashed: trash === "true" };
 
@@ -158,8 +159,13 @@ export const getOrders = async (req: Request, res: Response) => {
       ];
     }
 
-    if (status) where.status = status;
+    // Support comma-separated statuses e.g. "WaitForDesign,Revision,DesignSubmitted"
+    if (status) {
+      const statuses = (status as string).split(",").map((s) => s.trim()).filter(Boolean);
+      where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
+    }
     if (payment) where.paymentStatus = payment;
+    if (assignedDesignerId) where.assignedDesignerId = parseInt(assignedDesignerId as string);
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = parseInt(limit as string);
@@ -755,6 +761,22 @@ export const emptyOrderTrash = async (_req: Request, res: Response) => {
   try {
     const { count } = await prisma.order.deleteMany({ where: { isTrashed: true } });
     return res.json({ message: `${count} orders permanently deleted` });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const assignDesigner = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const { designerId } = req.body; // null to unassign
+    const order = await prisma.order.update({
+      where: { id },
+      data: { assignedDesignerId: designerId ?? null },
+      include: { items: true },
+    });
+    io.emit("order:updated", order);
+    return res.json({ order });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
   }

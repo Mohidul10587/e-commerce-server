@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
+exports.assignDesigner = exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
 const VALID_STATUSES = [
@@ -121,7 +121,7 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.createOrder = createOrder;
 const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { trash, search, page = "1", limit = "10", status, payment, sort, } = req.query;
+        const { trash, search, page = "1", limit = "10", status, payment, sort, assignedDesignerId, } = req.query;
         const where = { isTrashed: trash === "true" };
         if (search) {
             const s = search;
@@ -130,10 +130,15 @@ const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 { customerPhone: { contains: s, mode: "insensitive" } },
             ];
         }
-        if (status)
-            where.status = status;
+        // Support comma-separated statuses e.g. "WaitForDesign,Revision,DesignSubmitted"
+        if (status) {
+            const statuses = status.split(",").map((s) => s.trim()).filter(Boolean);
+            where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
+        }
         if (payment)
             where.paymentStatus = payment;
+        if (assignedDesignerId)
+            where.assignedDesignerId = parseInt(assignedDesignerId);
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
         const orderDir = sort === "asc" ? "asc" : "desc";
@@ -712,3 +717,20 @@ const emptyOrderTrash = (_req, res) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.emptyOrderTrash = emptyOrderTrash;
+const assignDesigner = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const id = Number(req.params.id);
+        const { designerId } = req.body; // null to unassign
+        const order = yield prisma_1.prisma.order.update({
+            where: { id },
+            data: { assignedDesignerId: designerId !== null && designerId !== void 0 ? designerId : null },
+            include: { items: true },
+        });
+        index_1.io.emit("order:updated", order);
+        return res.json({ order });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.assignDesigner = assignDesigner;

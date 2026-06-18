@@ -11,6 +11,6 @@ router.post("/", auth_1.verifyAdminOrManager, purchase_controller_1.createPurcha
 router.put("/:id", auth_1.verifyAdminOrManager, purchase_controller_1.updatePurchase);
 router.patch("/:id/status", auth_1.verifyAdminOrManager, purchase_controller_1.updatePurchaseStatus);
 router.patch("/:id/restore", auth_1.verifyAdminOrManager, purchase_controller_1.restorePurchase);
-router.delete("/trash/empty", auth_1.verifyAdminOrManager, purchase_controller_1.emptyPurchaseTrash);
+router.delete("/trash/empty", auth_1.verifyAdmin, purchase_controller_1.emptyPurchaseTrash);
 router.delete("/:id", auth_1.verifyAdminOrManager, purchase_controller_1.movePurchaseToTrash);
-router.delete("/:id/permanent", auth_1.verifyAdminOrManager, purchase_controller_1.deletePurchase);
+router.delete("/:id/permanent", auth_1.verifyAdmin, purchase_controller_1.deletePurchase);

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyAdminManagerOrSupport = exports.verifyAdminOrManager = exports.verifyAdmin = exports.verifyUserInactive = exports.verifyUser = void 0;
+exports.verifyAdminManagerSupportOrDesigner = exports.verifyAdminManagerSupportOrProduction = exports.verifyAdminManagerSupportDesignerOrProduction = exports.verifyAdminManagerOrSupport = exports.verifyAdminOrManager = exports.verifyAdmin = exports.verifyUserInactive = exports.verifyUser = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../lib/prisma"));
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -136,3 +136,66 @@ const verifyAdminManagerOrSupport = (req, res, next) => __awaiter(void 0, void 0
     }
 });
 exports.verifyAdminManagerOrSupport = verifyAdminManagerOrSupport;
+/** Admin, Manager, Support, Designer, Production */
+const verifyAdminManagerSupportDesignerOrProduction = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const token = req.cookies.token;
+        if (!token)
+            return sessionExpired(res);
+        const user = yield getUserFromToken(req);
+        if (!user)
+            return sessionExpired(res);
+        const allowed = ["admin", "manager", "support", "designer", "production"];
+        if (!allowed.includes(user.role))
+            return res.status(403).json({ message: "Access required" });
+        // @ts-ignore
+        req.user = user;
+        next();
+    }
+    catch (_a) {
+        return sessionExpired(res);
+    }
+});
+exports.verifyAdminManagerSupportDesignerOrProduction = verifyAdminManagerSupportDesignerOrProduction;
+/** Admin, Manager, Support, Production (for inventory) */
+const verifyAdminManagerSupportOrProduction = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const token = req.cookies.token;
+        if (!token)
+            return sessionExpired(res);
+        const user = yield getUserFromToken(req);
+        if (!user)
+            return sessionExpired(res);
+        const allowed = ["admin", "manager", "support", "production"];
+        if (!allowed.includes(user.role))
+            return res.status(403).json({ message: "Access required" });
+        // @ts-ignore
+        req.user = user;
+        next();
+    }
+    catch (_a) {
+        return sessionExpired(res);
+    }
+});
+exports.verifyAdminManagerSupportOrProduction = verifyAdminManagerSupportOrProduction;
+/** Admin, Manager, Support, Designer (for assign designer) */
+const verifyAdminManagerSupportOrDesigner = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const token = req.cookies.token;
+        if (!token)
+            return sessionExpired(res);
+        const user = yield getUserFromToken(req);
+        if (!user)
+            return sessionExpired(res);
+        const allowed = ["admin", "manager", "support", "designer"];
+        if (!allowed.includes(user.role))
+            return res.status(403).json({ message: "Access required" });
+        // @ts-ignore
+        req.user = user;
+        next();
+    }
+    catch (_a) {
+        return sessionExpired(res);
+    }
+});
+exports.verifyAdminManagerSupportOrDesigner = verifyAdminManagerSupportOrDesigner;

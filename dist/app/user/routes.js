@@ -13,6 +13,7 @@ router.post("/refresh", controller_1.refresh);
 router.post("/logout", controller_1.logout);
 router.put("/change-password", auth_1.verifyUser, controller_1.changePassword);
 // Manager can view & create/update users, but NOT remove admins (admin-only for delete/restore)
+router.get("/designers", auth_1.verifyAdminManagerSupportDesignerOrProduction, controller_1.getDesigners);
 router.get("/", auth_1.verifyAdminOrManager, controller_1.getUsers);
 router.post("/", auth_1.verifyAdmin, controller_1.createUser);
 router.put("/:id", auth_1.verifyAdmin, controller_1.updateUser);

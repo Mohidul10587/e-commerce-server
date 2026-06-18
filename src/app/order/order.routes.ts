@@ -6,8 +6,9 @@ import {
   updateOrderItemSealText, addOrderItem, removeOrderItem, updateOrderItemQuantity, updateOrderItemVariant,
   bulkTrashOrders, bulkRestoreOrders, bulkUpdateOrderStatus,
   getOrderStatusCounts, getOrderPayments, deleteOrderPayment, updateOrderPaymentTx,
+  assignDesigner,
 } from "./order.controller";
-import { verifyAdminManagerSupportDesignerOrProduction, verifyAdminManagerOrSupport, verifyAdmin } from "../../middleware/auth";
+import { verifyAdminManagerSupportDesignerOrProduction, verifyAdminManagerOrSupport, verifyAdminManagerSupportOrDesigner, verifyAdmin } from "../../middleware/auth";
 
 export const orderRoutes = Router();
 
@@ -30,6 +31,7 @@ orderRoutes.post("/", verifyAdminManagerOrSupport, createOrder);
 orderRoutes.get("/", getOrders);
 orderRoutes.get("/:id", getOrderById);
 orderRoutes.patch("/:id/status", verifyAdminManagerOrSupport, updateOrderStatus);
+orderRoutes.patch("/:id/assign-designer", verifyAdminManagerSupportOrDesigner, assignDesigner);
 orderRoutes.patch("/:id/payment", verifyAdminManagerOrSupport, updateOrderPayment);
 orderRoutes.get("/:id/payments", getOrderPayments);
 orderRoutes.patch("/:id/payments/:txId", verifyAdminManagerOrSupport, updateOrderPaymentTx);
@@ -37,7 +39,7 @@ orderRoutes.delete("/:id/payments/:txId", verifyAdminManagerOrSupport, deleteOrd
 orderRoutes.patch("/:id/discount", verifyAdminManagerOrSupport, updateOrderDiscount);
 orderRoutes.post("/:id/items", verifyAdminManagerOrSupport, addOrderItem);
 orderRoutes.put("/:id", verifyAdminManagerOrSupport, updateOrder);
-orderRoutes.delete("/trash/empty", verifyAdmin, emptyOrderTrash);
-orderRoutes.delete("/:id", verifyAdminManagerOrSupport, moveOrderToTrash);
 orderRoutes.patch("/:id/restore", verifyAdminManagerOrSupport, restoreOrder);
 orderRoutes.delete("/:id/permanent", verifyAdmin, permanentDeleteOrder);
+orderRoutes.delete("/trash/empty", verifyAdmin, emptyOrderTrash);
+orderRoutes.delete("/:id", verifyAdminManagerOrSupport, moveOrderToTrash);

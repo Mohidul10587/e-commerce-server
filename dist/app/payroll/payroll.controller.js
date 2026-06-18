@@ -17,6 +17,7 @@ exports.listPayrolls = listPayrolls;
 exports.generatePayrolls = generatePayrolls;
 exports.createPayroll = createPayroll;
 exports.updatePayroll = updatePayroll;
+exports.revertToPending = revertToPending;
 exports.markAsPaid = markAsPaid;
 exports.trashPayroll = trashPayroll;
 exports.restorePayroll = restorePayroll;
@@ -191,6 +192,21 @@ function updatePayroll(req, res) {
                     totalPayable,
                     note: note || null,
                 },
+            });
+            return res.json({ payroll });
+        }
+        catch (_a) {
+            return res.status(500).json({ message: "Server error" });
+        }
+    });
+}
+function revertToPending(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const id = parseInt(req.params.id);
+            const payroll = yield prisma_1.default.payroll.update({
+                where: { id },
+                data: { status: "Pending", paidAt: null },
             });
             return res.json({ payroll });
         }

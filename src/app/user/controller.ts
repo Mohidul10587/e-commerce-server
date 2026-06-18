@@ -266,3 +266,16 @@ export async function changePassword(req: Request, res: Response) {
     return res.status(500).json({ message: "Server error" });
   }
 }
+
+export async function getDesigners(req: Request, res: Response) {
+  try {
+    const designers = await prisma.user.findMany({
+      where: { role: "designer", isTrashed: false },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+    return res.json({ designers });
+  } catch {
+    return res.status(500).json({ message: "Server error" });
+  }
+}
