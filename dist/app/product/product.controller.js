@@ -30,6 +30,7 @@ exports.getProductBySlug = getProductBySlug;
 exports.getProductById = getProductById;
 exports.createProduct = createProduct;
 exports.updateProduct = updateProduct;
+exports.copyProduct = copyProduct;
 exports.moveToTrash = moveToTrash;
 exports.restoreFromTrash = restoreFromTrash;
 exports.permanentDeleteProduct = permanentDeleteProduct;
@@ -283,6 +284,57 @@ function updateProduct(req, res) {
         catch (error) {
             if (error.status)
                 return res.status(error.status).json({ message: error.message });
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function copyProduct(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const id = parseInt(req.params.id);
+            const source = yield prisma_1.default.product.findUnique({
+                where: { id },
+                include: { variants: { orderBy: { isDefault: "desc" } } },
+            });
+            if (!source)
+                return res.status(404).json({ message: "Product not found" });
+            const suffix = `-copy-${Date.now()}`;
+            const newSlug = source.slug + suffix;
+            const product = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
+                const created = yield tx.product.create({
+                    data: {
+                        title: source.title + " (Copy)",
+                        slug: newSlug,
+                        description: source.description,
+                        seoTitle: source.seoTitle,
+                        seoDescription: source.seoDescription,
+                        keywords: source.keywords,
+                        type: source.type,
+                        isFreeGift: false,
+                        totalStock: 0,
+                        variants: {
+                            create: source.variants.map((v) => ({
+                                title: v.title,
+                                size: v.size,
+                                color: v.color,
+                                regularPrice: v.regularPrice,
+                                salePrice: v.salePrice,
+                                purchasePrice: v.purchasePrice,
+                                stock: 0,
+                                sku: v.sku + suffix,
+                                images: v.images,
+                                isDefault: v.isDefault,
+                                isActive: v.isActive,
+                            })),
+                        },
+                    },
+                    include: productInclude,
+                });
+                return created;
+            }));
+            return res.status(201).json({ message: "Product copied", product });
+        }
+        catch (error) {
             return res.status(500).json({ message: "Server error", error });
         }
     });

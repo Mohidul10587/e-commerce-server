@@ -255,6 +255,57 @@ export async function updateProduct(req: Request, res: Response) {
   }
 }
 
+export async function copyProduct(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    const source = await prisma.product.findUnique({
+      where: { id },
+      include: { variants: { orderBy: { isDefault: "desc" as const } } },
+    });
+    if (!source) return res.status(404).json({ message: "Product not found" });
+
+    const suffix = `-copy-${Date.now()}`;
+    const newSlug = source.slug + suffix;
+
+    const product = await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({
+        data: {
+          title: source.title + " (Copy)",
+          slug: newSlug,
+          description: source.description,
+          seoTitle: source.seoTitle,
+          seoDescription: source.seoDescription,
+          keywords: source.keywords,
+          type: source.type,
+          isFreeGift: false,
+          totalStock: 0,
+          variants: {
+            create: source.variants.map((v) => ({
+              title: v.title,
+              size: v.size,
+              color: v.color,
+              regularPrice: v.regularPrice,
+              salePrice: v.salePrice,
+              purchasePrice: v.purchasePrice,
+              stock: 0,
+              sku: v.sku + suffix,
+              images: v.images,
+              isDefault: v.isDefault,
+              isActive: v.isActive,
+            })),
+          },
+        },
+        include: productInclude,
+      });
+      return created;
+    });
+
+    return res.status(201).json({ message: "Product copied", product });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
 export async function moveToTrash(req: Request, res: Response) {
   try {
     const id = parseInt(req.params.id);

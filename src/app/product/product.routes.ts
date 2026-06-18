@@ -1,7 +1,7 @@
 import { Router } from "express";
 import {
   getProducts, getProductBySlug, getProductById, getFreeGiftProduct, getInkProducts,
-  createProduct, updateProduct,
+  createProduct, updateProduct, copyProduct,
   moveToTrash, restoreFromTrash, permanentDeleteProduct, emptyProductTrash,
   updateVariantStock, getStockHistory,
 } from "./product.controller";
@@ -18,6 +18,7 @@ productRoutes.get("/:id", getProductById);
 
 // Protected write routes
 productRoutes.post("/", verifyAdminOrManager, createProduct);
+productRoutes.post("/:id/copy", verifyAdminOrManager, copyProduct);
 productRoutes.put("/:id", verifyAdminOrManager, updateProduct);
 productRoutes.patch("/variants/:variantId/stock", verifyAdminOrManager, updateVariantStock);
 productRoutes.get("/variants/:variantId/stock-history", verifyAdminOrManager, getStockHistory);

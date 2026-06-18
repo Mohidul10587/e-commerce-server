@@ -13,6 +13,7 @@ exports.productRoutes.get("/slug/:slug", product_controller_1.getProductBySlug);
 exports.productRoutes.get("/:id", product_controller_1.getProductById);
 // Protected write routes
 exports.productRoutes.post("/", auth_1.verifyAdminOrManager, product_controller_1.createProduct);
+exports.productRoutes.post("/:id/copy", auth_1.verifyAdminOrManager, product_controller_1.copyProduct);
 exports.productRoutes.put("/:id", auth_1.verifyAdminOrManager, product_controller_1.updateProduct);
 exports.productRoutes.patch("/variants/:variantId/stock", auth_1.verifyAdminOrManager, product_controller_1.updateVariantStock);
 exports.productRoutes.get("/variants/:variantId/stock-history", auth_1.verifyAdminOrManager, product_controller_1.getStockHistory);
