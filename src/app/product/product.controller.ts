@@ -155,9 +155,16 @@ export async function createProduct(req: Request, res: Response) {
     const product = await prisma.$transaction(async (tx) => {
       // Enforce single free gift product
       if (productData.isFreeGift) {
-        const existing = await tx.product.findFirst({ where: { isFreeGift: true, isTrashed: false } });
+        const existing = await tx.product.findFirst({
+          where: { isFreeGift: true, isTrashed: false },
+        });
         if (existing)
-          throw Object.assign(new Error(`"${existing.title}" is already marked as the free gift. Remove that tag first.`), { status: 409 });
+          throw Object.assign(
+            new Error(
+              `"${existing.title}" is already marked as the free gift. Remove that tag first.`
+            ),
+            { status: 409 }
+          );
       }
 
       const created = await tx.product.create({
@@ -193,7 +200,8 @@ export async function createProduct(req: Request, res: Response) {
 
     return res.status(201).json({ message: "Product created", product });
   } catch (error: any) {
-    if (error.status) return res.status(error.status).json({ message: error.message });
+    if (error.status)
+      return res.status(error.status).json({ message: error.message });
     return res.status(500).json({ message: "Server error", error });
   }
 }
@@ -231,9 +239,16 @@ export async function updateProduct(req: Request, res: Response) {
     const product = await prisma.$transaction(async (tx) => {
       // Enforce single free gift product (exclude self when editing)
       if (productData.isFreeGift) {
-        const existing = await tx.product.findFirst({ where: { isFreeGift: true, isTrashed: false, NOT: { id } } });
+        const existing = await tx.product.findFirst({
+          where: { isFreeGift: true, isTrashed: false, NOT: { id } },
+        });
         if (existing)
-          throw Object.assign(new Error(`"${existing.title}" is already marked as the free gift. Remove that tag first.`), { status: 409 });
+          throw Object.assign(
+            new Error(
+              `"${existing.title}" is already marked as the free gift. Remove that tag first.`
+            ),
+            { status: 409 }
+          );
       }
 
       await tx.product.update({
@@ -250,7 +265,8 @@ export async function updateProduct(req: Request, res: Response) {
 
     return res.json({ message: "Product updated", product });
   } catch (error: any) {
-    if (error.status) return res.status(error.status).json({ message: error.message });
+    if (error.status)
+      return res.status(error.status).json({ message: error.message });
     return res.status(500).json({ message: "Server error", error });
   }
 }
@@ -302,6 +318,7 @@ export async function copyProduct(req: Request, res: Response) {
 
     return res.status(201).json({ message: "Product copied", product });
   } catch (error) {
+    console.log(error);
     return res.status(500).json({ message: "Server error", error });
   }
 }
@@ -338,7 +355,9 @@ export async function permanentDeleteProduct(req: Request, res: Response) {
 
 export async function emptyProductTrash(_req: Request, res: Response) {
   try {
-    const { count } = await prisma.product.deleteMany({ where: { isTrashed: true } });
+    const { count } = await prisma.product.deleteMany({
+      where: { isTrashed: true },
+    });
     return res.json({ message: `${count} products permanently deleted` });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });

@@ -195,7 +195,9 @@ function createProduct(req, res) {
                 var _a, _b;
                 // Enforce single free gift product
                 if (productData.isFreeGift) {
-                    const existing = yield tx.product.findFirst({ where: { isFreeGift: true, isTrashed: false } });
+                    const existing = yield tx.product.findFirst({
+                        where: { isFreeGift: true, isTrashed: false },
+                    });
                     if (existing)
                         throw Object.assign(new Error(`"${existing.title}" is already marked as the free gift. Remove that tag first.`), { status: 409 });
                 }
@@ -264,7 +266,9 @@ function updateProduct(req, res) {
                 var _a;
                 // Enforce single free gift product (exclude self when editing)
                 if (productData.isFreeGift) {
-                    const existing = yield tx.product.findFirst({ where: { isFreeGift: true, isTrashed: false, NOT: { id } } });
+                    const existing = yield tx.product.findFirst({
+                        where: { isFreeGift: true, isTrashed: false, NOT: { id } },
+                    });
                     if (existing)
                         throw Object.assign(new Error(`"${existing.title}" is already marked as the free gift. Remove that tag first.`), { status: 409 });
                 }
@@ -335,6 +339,7 @@ function copyProduct(req, res) {
             return res.status(201).json({ message: "Product copied", product });
         }
         catch (error) {
+            console.log(error);
             return res.status(500).json({ message: "Server error", error });
         }
     });
@@ -378,7 +383,9 @@ function permanentDeleteProduct(req, res) {
 function emptyProductTrash(_req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { count } = yield prisma_1.default.product.deleteMany({ where: { isTrashed: true } });
+            const { count } = yield prisma_1.default.product.deleteMany({
+                where: { isTrashed: true },
+            });
             return res.json({ message: `${count} products permanently deleted` });
         }
         catch (error) {
