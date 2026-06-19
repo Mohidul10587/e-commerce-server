@@ -12,7 +12,10 @@ import { verifyAdminManagerSupportDesignerOrProduction, verifyAdminManagerOrSupp
 
 export const orderRoutes = Router();
 
-// All 5 roles can access orders; write operations restricted to admin/manager/support/designer (not production)
+// Public order creation (no auth required for landing/cart/buyNow)
+orderRoutes.post("/", createOrder);
+
+// All other routes require auth
 orderRoutes.use(verifyAdminManagerSupportDesignerOrProduction);
 
 // Bulk routes (must be before /:id)
@@ -27,7 +30,6 @@ orderRoutes.patch("/items/:itemId/variant", verifyAdminManagerOrSupport, updateO
 orderRoutes.delete("/items/:itemId", verifyAdminManagerOrSupport, removeOrderItem);
 
 orderRoutes.get("/counts", getOrderStatusCounts);
-orderRoutes.post("/", verifyAdminManagerOrSupport, createOrder);
 orderRoutes.get("/", getOrders);
 orderRoutes.get("/:id", getOrderById);
 orderRoutes.patch("/:id/status", verifyAdminManagerOrSupport, updateOrderStatus);

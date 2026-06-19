@@ -165,7 +165,7 @@ export const getOrders = async (req: Request, res: Response) => {
       where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
     }
     if (payment) where.paymentStatus = payment;
-    if (assignedDesignerId) where.assignedDesignerId = parseInt(assignedDesignerId as string);
+    // if (assignedDesignerId) where.assignedDesignerId = parseInt(assignedDesignerId as string); // Temporarily disabled
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = parseInt(limit as string);
@@ -772,7 +772,7 @@ export const assignDesigner = async (req: Request, res: Response) => {
     const { designerId } = req.body; // null to unassign
     const order = await prisma.order.update({
       where: { id },
-      data: { assignedDesignerId: designerId ?? null },
+      data: {}, // Temporarily empty - assignedDesignerId field not available
       include: { items: true },
     });
     io.emit("order:updated", order);

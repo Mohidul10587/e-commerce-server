@@ -5,7 +5,9 @@ const express_1 = require("express");
 const order_controller_1 = require("./order.controller");
 const auth_1 = require("../../middleware/auth");
 exports.orderRoutes = (0, express_1.Router)();
-// All 5 roles can access orders; write operations restricted to admin/manager/support/designer (not production)
+// Public order creation (no auth required for landing/cart/buyNow)
+exports.orderRoutes.post("/", order_controller_1.createOrder);
+// All other routes require auth
 exports.orderRoutes.use(auth_1.verifyAdminManagerSupportDesignerOrProduction);
 // Bulk routes (must be before /:id)
 exports.orderRoutes.post("/bulk/trash", auth_1.verifyAdminManagerOrSupport, order_controller_1.bulkTrashOrders);
@@ -17,7 +19,6 @@ exports.orderRoutes.patch("/items/:itemId/quantity", auth_1.verifyAdminManagerOr
 exports.orderRoutes.patch("/items/:itemId/variant", auth_1.verifyAdminManagerOrSupport, order_controller_1.updateOrderItemVariant);
 exports.orderRoutes.delete("/items/:itemId", auth_1.verifyAdminManagerOrSupport, order_controller_1.removeOrderItem);
 exports.orderRoutes.get("/counts", order_controller_1.getOrderStatusCounts);
-exports.orderRoutes.post("/", auth_1.verifyAdminManagerOrSupport, order_controller_1.createOrder);
 exports.orderRoutes.get("/", order_controller_1.getOrders);
 exports.orderRoutes.get("/:id", order_controller_1.getOrderById);
 exports.orderRoutes.patch("/:id/status", auth_1.verifyAdminManagerOrSupport, order_controller_1.updateOrderStatus);

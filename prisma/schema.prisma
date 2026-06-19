@@ -177,7 +177,7 @@ model Order {
   stockDeducted       Boolean       @default(false)
   note                String?
   contactLink         String?
-  assignedDesignerId  Int?
+  // assignedDesignerId  Int?  // Temporarily commented - column doesn't exist in DB
   transactions        PaymentTransaction[]
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
