@@ -152,6 +152,12 @@ enum OrderStatus {
   Delivered
   PartlyDelivered
   Cancel
+  CourierHold
+  DeliveredApprovalPending
+  PartialDeliveredApprovalPending
+  CancelledApprovalPending
+  UnknownApprovalPending
+  CourierUnknown
 }
 
 enum PaymentStatus {

@@ -158,7 +158,10 @@ const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         // Support comma-separated statuses e.g. "WaitForDesign,Revision,DesignSubmitted"
         if (status) {
-            const statuses = status.split(",").map((s) => s.trim()).filter(Boolean);
+            const statuses = status
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
             where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
         }
         if (payment)
@@ -219,7 +222,11 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
         const from = existing.status;
         // Block: Group A → Group B directly (must go through OrderConfirmed)
         if (GROUP_A.has(from) && GROUP_B.has(status)) {
-            return res.status(400).json({ message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.` });
+            return res
+                .status(400)
+                .json({
+                message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.`,
+            });
         }
         yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
             var _a, _b;
@@ -237,10 +244,21 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
                         data: { stock: { decrement: item.quantity } },
                     });
                     yield tx.stockHistory.create({
-                        data: { variantId: item.variantId, action: "SALE", quantity: item.quantity, note: `Order #${id} confirmed` },
+                        data: {
+                            variantId: item.variantId,
+                            action: "SALE",
+                            quantity: item.quantity,
+                            note: `Order #${id} confirmed`,
+                        },
                     });
-                    const agg = yield tx.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { stock: true } });
-                    yield tx.product.update({ where: { id: variant.productId }, data: { totalStock: (_a = agg._sum.stock) !== null && _a !== void 0 ? _a : 0 } });
+                    const agg = yield tx.productVariant.aggregate({
+                        where: { productId: variant.productId },
+                        _sum: { stock: true },
+                    });
+                    yield tx.product.update({
+                        where: { id: variant.productId },
+                        data: { totalStock: (_a = agg._sum.stock) !== null && _a !== void 0 ? _a : 0 },
+                    });
                 }
                 yield tx.order.update({ where: { id }, data: { stockDeducted: true } });
             }
@@ -258,12 +276,26 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
                         data: { stock: { increment: item.quantity } },
                     });
                     yield tx.stockHistory.create({
-                        data: { variantId: item.variantId, action: "RETURN", quantity: item.quantity, note: `Order #${id} returned to ${status}` },
+                        data: {
+                            variantId: item.variantId,
+                            action: "RETURN",
+                            quantity: item.quantity,
+                            note: `Order #${id} returned to ${status}`,
+                        },
                     });
-                    const agg = yield tx.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { stock: true } });
-                    yield tx.product.update({ where: { id: variant.productId }, data: { totalStock: (_b = agg._sum.stock) !== null && _b !== void 0 ? _b : 0 } });
+                    const agg = yield tx.productVariant.aggregate({
+                        where: { productId: variant.productId },
+                        _sum: { stock: true },
+                    });
+                    yield tx.product.update({
+                        where: { id: variant.productId },
+                        data: { totalStock: (_b = agg._sum.stock) !== null && _b !== void 0 ? _b : 0 },
+                    });
                 }
-                yield tx.order.update({ where: { id }, data: { stockDeducted: false } });
+                yield tx.order.update({
+                    where: { id },
+                    data: { stockDeducted: false },
+                });
             }
             const extraData = { status };
             if (status === "OrderConfirmed" && !existing.confirmedAt) {
@@ -271,7 +303,10 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
             }
             yield tx.order.update({ where: { id }, data: extraData });
         }));
-        let order = yield prisma_1.prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
+        let order = yield prisma_1.prisma.order.findUniqueOrThrow({
+            where: { id },
+            include: { items: true },
+        });
         // Auto-create SteadFast consignment on InReview (only once)
         if (status === "InReview" && !((_a = order.courier) === null || _a === void 0 ? void 0 : _a.consignment_id)) {
             try {
@@ -299,6 +334,7 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
                     data: { courier: courierData },
                     include: { items: true },
                 });
+                console.log(`[Courier] ✅ Order #${id} submitted to SteadFast successfully.\n`, `  consignment_id : ${consignment.consignment_id}\n`, `  tracking_code  : ${consignment.tracking_code}\n`, `  invoice        : ${consignment.invoice}\n`, `  status         : ${consignment.status}\n`, `  cod_amount     : ${consignment.cod_amount}`);
             }
             catch (courierErr) {
                 console.error(`[Courier] Failed to create consignment for order #${id}:`, courierErr.message);
@@ -688,7 +724,9 @@ const deleteOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, funct
     var _a, _b;
     try {
         const txId = Number(req.params.txId);
-        const tx = yield prisma_1.prisma.paymentTransaction.findUnique({ where: { id: txId } });
+        const tx = yield prisma_1.prisma.paymentTransaction.findUnique({
+            where: { id: txId },
+        });
         if (!tx)
             return res.status(404).json({ message: "Transaction not found" });
         yield prisma_1.prisma.paymentTransaction.delete({ where: { id: txId } });
@@ -698,9 +736,19 @@ const deleteOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, funct
             _sum: { amount: true },
         });
         const newPaid = (_a = agg._sum.amount) !== null && _a !== void 0 ? _a : 0;
-        const order = yield prisma_1.prisma.order.findUnique({ where: { id: tx.orderId }, select: { total: true } });
-        const paymentStatus = newPaid <= 0 ? "unpaid" : newPaid >= ((_b = order === null || order === void 0 ? void 0 : order.total) !== null && _b !== void 0 ? _b : 0) ? "paid" : "partial";
-        yield prisma_1.prisma.order.update({ where: { id: tx.orderId }, data: { paidAmount: newPaid, paymentStatus } });
+        const order = yield prisma_1.prisma.order.findUnique({
+            where: { id: tx.orderId },
+            select: { total: true },
+        });
+        const paymentStatus = newPaid <= 0
+            ? "unpaid"
+            : newPaid >= ((_b = order === null || order === void 0 ? void 0 : order.total) !== null && _b !== void 0 ? _b : 0)
+                ? "paid"
+                : "partial";
+        yield prisma_1.prisma.order.update({
+            where: { id: tx.orderId },
+            data: { paidAmount: newPaid, paymentStatus },
+        });
         index_1.io.emit("order:updated", { id: tx.orderId });
         return res.json({ message: "Payment deleted" });
     }
@@ -714,7 +762,9 @@ const updateOrderPaymentTx = (req, res) => __awaiter(void 0, void 0, void 0, fun
     try {
         const txId = Number(req.params.txId);
         const { amount, source, trxId, note } = req.body;
-        const tx = yield prisma_1.prisma.paymentTransaction.findUnique({ where: { id: txId } });
+        const tx = yield prisma_1.prisma.paymentTransaction.findUnique({
+            where: { id: txId },
+        });
         if (!tx)
             return res.status(404).json({ message: "Transaction not found" });
         yield prisma_1.prisma.paymentTransaction.update({
@@ -731,9 +781,19 @@ const updateOrderPaymentTx = (req, res) => __awaiter(void 0, void 0, void 0, fun
             _sum: { amount: true },
         });
         const newPaid = (_a = agg._sum.amount) !== null && _a !== void 0 ? _a : 0;
-        const order = yield prisma_1.prisma.order.findUnique({ where: { id: tx.orderId }, select: { total: true } });
-        const paymentStatus = newPaid <= 0 ? "unpaid" : newPaid >= ((_b = order === null || order === void 0 ? void 0 : order.total) !== null && _b !== void 0 ? _b : 0) ? "paid" : "partial";
-        yield prisma_1.prisma.order.update({ where: { id: tx.orderId }, data: { paidAmount: newPaid, paymentStatus } });
+        const order = yield prisma_1.prisma.order.findUnique({
+            where: { id: tx.orderId },
+            select: { total: true },
+        });
+        const paymentStatus = newPaid <= 0
+            ? "unpaid"
+            : newPaid >= ((_b = order === null || order === void 0 ? void 0 : order.total) !== null && _b !== void 0 ? _b : 0)
+                ? "paid"
+                : "partial";
+        yield prisma_1.prisma.order.update({
+            where: { id: tx.orderId },
+            data: { paidAmount: newPaid, paymentStatus },
+        });
         index_1.io.emit("order:updated", { id: tx.orderId });
         return res.json({ message: "Payment updated" });
     }
@@ -758,12 +818,21 @@ const updateOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, funct
         const paymentStatus = newPaid >= existing.total ? "paid" : "partial";
         const order = yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
             yield tx.paymentTransaction.create({
-                data: { orderId: id, amount: Number(amount), note: note || null, source: source || null, trxId: trxId || null },
+                data: {
+                    orderId: id,
+                    amount: Number(amount),
+                    note: note || null,
+                    source: source || null,
+                    trxId: trxId || null,
+                },
             });
             return tx.order.update({
                 where: { id },
                 data: { paidAmount: newPaid, paymentStatus, paidAt: new Date() },
-                include: { items: true, transactions: { orderBy: { createdAt: "asc" } } },
+                include: {
+                    items: true,
+                    transactions: { orderBy: { createdAt: "asc" } },
+                },
             });
         }));
         index_1.io.emit("order:updated", order);
@@ -776,7 +845,9 @@ const updateOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, funct
 exports.updateOrderPayment = updateOrderPayment;
 const emptyOrderTrash = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { count } = yield prisma_1.prisma.order.deleteMany({ where: { isTrashed: true } });
+        const { count } = yield prisma_1.prisma.order.deleteMany({
+            where: { isTrashed: true },
+        });
         return res.json({ message: `${count} orders permanently deleted` });
     }
     catch (_a) {

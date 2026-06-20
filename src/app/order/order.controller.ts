@@ -189,7 +189,10 @@ export const getOrders = async (req: Request, res: Response) => {
 
     // Support comma-separated statuses e.g. "WaitForDesign,Revision,DesignSubmitted"
     if (status) {
-      const statuses = (status as string).split(",").map((s) => s.trim()).filter(Boolean);
+      const statuses = (status as string)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
       where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
     }
     if (payment) where.paymentStatus = payment;
@@ -252,7 +255,11 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 
     // Block: Group A → Group B directly (must go through OrderConfirmed)
     if (GROUP_A.has(from) && GROUP_B.has(status)) {
-      return res.status(400).json({ message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.` });
+      return res
+        .status(400)
+        .json({
+          message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.`,
+        });
     }
 
     await prisma.$transaction(async (tx) => {
@@ -269,10 +276,21 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
             data: { stock: { decrement: item.quantity } },
           });
           await tx.stockHistory.create({
-            data: { variantId: item.variantId, action: "SALE", quantity: item.quantity, note: `Order #${id} confirmed` },
+            data: {
+              variantId: item.variantId,
+              action: "SALE",
+              quantity: item.quantity,
+              note: `Order #${id} confirmed`,
+            },
           });
-          const agg = await tx.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { stock: true } });
-          await tx.product.update({ where: { id: variant.productId }, data: { totalStock: agg._sum.stock ?? 0 } });
+          const agg = await tx.productVariant.aggregate({
+            where: { productId: variant.productId },
+            _sum: { stock: true },
+          });
+          await tx.product.update({
+            where: { id: variant.productId },
+            data: { totalStock: agg._sum.stock ?? 0 },
+          });
         }
         await tx.order.update({ where: { id }, data: { stockDeducted: true } });
       }
@@ -290,12 +308,26 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
             data: { stock: { increment: item.quantity } },
           });
           await tx.stockHistory.create({
-            data: { variantId: item.variantId, action: "RETURN", quantity: item.quantity, note: `Order #${id} returned to ${status}` },
+            data: {
+              variantId: item.variantId,
+              action: "RETURN",
+              quantity: item.quantity,
+              note: `Order #${id} returned to ${status}`,
+            },
           });
-          const agg = await tx.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { stock: true } });
-          await tx.product.update({ where: { id: variant.productId }, data: { totalStock: agg._sum.stock ?? 0 } });
+          const agg = await tx.productVariant.aggregate({
+            where: { productId: variant.productId },
+            _sum: { stock: true },
+          });
+          await tx.product.update({
+            where: { id: variant.productId },
+            data: { totalStock: agg._sum.stock ?? 0 },
+          });
         }
-        await tx.order.update({ where: { id }, data: { stockDeducted: false } });
+        await tx.order.update({
+          where: { id },
+          data: { stockDeducted: false },
+        });
       }
 
       const extraData: any = { status };
@@ -305,7 +337,10 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       await tx.order.update({ where: { id }, data: extraData });
     });
 
-    let order = await prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
+    let order = await prisma.order.findUniqueOrThrow({
+      where: { id },
+      include: { items: true },
+    });
 
     // Auto-create SteadFast consignment on InReview (only once)
     if (status === "InReview" && !(order.courier as any)?.consignment_id) {
@@ -334,8 +369,19 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
           data: { courier: courierData },
           include: { items: true },
         });
+        console.log(
+          `[Courier] ✅ Order #${id} submitted to SteadFast successfully.\n`,
+          `  consignment_id : ${consignment.consignment_id}\n`,
+          `  tracking_code  : ${consignment.tracking_code}\n`,
+          `  invoice        : ${consignment.invoice}\n`,
+          `  status         : ${consignment.status}\n`,
+          `  cod_amount     : ${consignment.cod_amount}`
+        );
       } catch (courierErr: any) {
-        console.error(`[Courier] Failed to create consignment for order #${id}:`, courierErr.message);
+        console.error(
+          `[Courier] Failed to create consignment for order #${id}:`,
+          courierErr.message
+        );
         // Non-fatal: order status is already updated; log and continue
       }
     }
@@ -366,7 +412,8 @@ export const updateOrder = async (req: Request, res: Response) => {
     const data: any = {};
     if (customerName) data.customerName = customerName;
     if (customerPhone) data.customerPhone = customerPhone;
-    if (alternativePhone !== undefined) data.alternativePhone = alternativePhone || null;
+    if (alternativePhone !== undefined)
+      data.alternativePhone = alternativePhone || null;
     if (address) data.address = address;
     if (contactLink !== undefined) data.contactLink = contactLink || null;
     if (note !== undefined) data.note = note || null;
@@ -739,7 +786,9 @@ export const getOrderPayments = async (req: Request, res: Response) => {
 export const deleteOrderPayment = async (req: Request, res: Response) => {
   try {
     const txId = Number(req.params.txId);
-    const tx = await prisma.paymentTransaction.findUnique({ where: { id: txId } });
+    const tx = await prisma.paymentTransaction.findUnique({
+      where: { id: txId },
+    });
     if (!tx) return res.status(404).json({ message: "Transaction not found" });
 
     await prisma.paymentTransaction.delete({ where: { id: txId } });
@@ -750,9 +799,20 @@ export const deleteOrderPayment = async (req: Request, res: Response) => {
       _sum: { amount: true },
     });
     const newPaid = agg._sum.amount ?? 0;
-    const order = await prisma.order.findUnique({ where: { id: tx.orderId }, select: { total: true } });
-    const paymentStatus = newPaid <= 0 ? "unpaid" : newPaid >= (order?.total ?? 0) ? "paid" : "partial";
-    await prisma.order.update({ where: { id: tx.orderId }, data: { paidAmount: newPaid, paymentStatus } });
+    const order = await prisma.order.findUnique({
+      where: { id: tx.orderId },
+      select: { total: true },
+    });
+    const paymentStatus =
+      newPaid <= 0
+        ? "unpaid"
+        : newPaid >= (order?.total ?? 0)
+        ? "paid"
+        : "partial";
+    await prisma.order.update({
+      where: { id: tx.orderId },
+      data: { paidAmount: newPaid, paymentStatus },
+    });
 
     io.emit("order:updated", { id: tx.orderId });
     return res.json({ message: "Payment deleted" });
@@ -765,7 +825,9 @@ export const updateOrderPaymentTx = async (req: Request, res: Response) => {
   try {
     const txId = Number(req.params.txId);
     const { amount, source, trxId, note } = req.body;
-    const tx = await prisma.paymentTransaction.findUnique({ where: { id: txId } });
+    const tx = await prisma.paymentTransaction.findUnique({
+      where: { id: txId },
+    });
     if (!tx) return res.status(404).json({ message: "Transaction not found" });
 
     await prisma.paymentTransaction.update({
@@ -783,9 +845,20 @@ export const updateOrderPaymentTx = async (req: Request, res: Response) => {
       _sum: { amount: true },
     });
     const newPaid = agg._sum.amount ?? 0;
-    const order = await prisma.order.findUnique({ where: { id: tx.orderId }, select: { total: true } });
-    const paymentStatus = newPaid <= 0 ? "unpaid" : newPaid >= (order?.total ?? 0) ? "paid" : "partial";
-    await prisma.order.update({ where: { id: tx.orderId }, data: { paidAmount: newPaid, paymentStatus } });
+    const order = await prisma.order.findUnique({
+      where: { id: tx.orderId },
+      select: { total: true },
+    });
+    const paymentStatus =
+      newPaid <= 0
+        ? "unpaid"
+        : newPaid >= (order?.total ?? 0)
+        ? "paid"
+        : "partial";
+    await prisma.order.update({
+      where: { id: tx.orderId },
+      data: { paidAmount: newPaid, paymentStatus },
+    });
 
     io.emit("order:updated", { id: tx.orderId });
     return res.json({ message: "Payment updated" });
@@ -809,17 +882,25 @@ export const updateOrderPayment = async (req: Request, res: Response) => {
     if (!existing) return res.status(404).json({ message: "Order not found" });
 
     const newPaid = existing.paidAmount + Number(amount);
-    const paymentStatus =
-      newPaid >= existing.total ? "paid" : "partial";
+    const paymentStatus = newPaid >= existing.total ? "paid" : "partial";
 
     const order = await prisma.$transaction(async (tx) => {
       await tx.paymentTransaction.create({
-        data: { orderId: id, amount: Number(amount), note: note || null, source: source || null, trxId: trxId || null },
+        data: {
+          orderId: id,
+          amount: Number(amount),
+          note: note || null,
+          source: source || null,
+          trxId: trxId || null,
+        },
       });
       return tx.order.update({
         where: { id },
         data: { paidAmount: newPaid, paymentStatus, paidAt: new Date() },
-        include: { items: true, transactions: { orderBy: { createdAt: "asc" } } },
+        include: {
+          items: true,
+          transactions: { orderBy: { createdAt: "asc" } },
+        },
       });
     });
 
@@ -832,7 +913,9 @@ export const updateOrderPayment = async (req: Request, res: Response) => {
 
 export const emptyOrderTrash = async (_req: Request, res: Response) => {
   try {
-    const { count } = await prisma.order.deleteMany({ where: { isTrashed: true } });
+    const { count } = await prisma.order.deleteMany({
+      where: { isTrashed: true },
+    });
     return res.json({ message: `${count} orders permanently deleted` });
   } catch {
     return res.status(500).json({ message: "Internal server error" });

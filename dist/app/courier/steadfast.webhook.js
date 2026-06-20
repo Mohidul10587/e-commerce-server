@@ -8,17 +8,30 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.steadfastWebhookRouter = void 0;
 const express_1 = require("express");
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
 exports.steadfastWebhookRouter = (0, express_1.Router)();
-const WEBHOOK_OK = { status: "success", message: "Webhook received successfully." };
+const WEBHOOK_OK = {
+    status: "success",
+    message: "Webhook received successfully.",
+};
 exports.steadfastWebhookRouter.post("/steadfast", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const token = (_a = req.headers["x-steadfast-token"]) !== null && _a !== void 0 ? _a : req.headers["authorization"];
+    if (token !== process.env.STEADFAST_WEBHOOK_TOKEN) {
+        return res.status(401).json({ message: "Unauthorized" });
+    }
     const payload = req.body;
     if (!payload || !payload.notification_type) {
-        return res.status(200).json(WEBHOOK_OK); // respond 200 even for unknown payloads
+        return res.status(200).json(WEBHOOK_OK);
     }
     try {
         if (payload.notification_type === "delivery_status") {
@@ -57,9 +70,24 @@ function handleDeliveryStatus(payload) {
         const existing = (_a = order.courier) !== null && _a !== void 0 ? _a : {};
         const courierUpdate = Object.assign(Object.assign({}, existing), { status: payload.status, delivery_charge: (_b = payload.delivery_charge) !== null && _b !== void 0 ? _b : existing.delivery_charge, cod_amount: (_c = payload.cod_amount) !== null && _c !== void 0 ? _c : existing.cod_amount, last_update: (_d = payload.updated_at) !== null && _d !== void 0 ? _d : new Date().toISOString() });
         const orderUpdate = { courier: courierUpdate };
+        const statusMap = {
+            in_review: "InReview",
+            pending: "Pending",
+            delivered: "Delivered",
+            partial_delivered: "PartlyDelivered",
+            cancelled: "Cancel",
+            hold: "CourierHold",
+            delivered_approval_pending: "DeliveredApprovalPending",
+            partial_delivered_approval_pending: "PartialDeliveredApprovalPending",
+            cancelled_approval_pending: "CancelledApprovalPending",
+            unknown_approval_pending: "UnknownApprovalPending",
+            unknown: "CourierUnknown",
+        };
+        const mappedStatus = statusMap[payload.status];
+        if (mappedStatus) {
+            orderUpdate.status = mappedStatus;
+        }
         if (payload.status === "delivered") {
-            orderUpdate.status = "Delivered";
-            // On delivery: if order has unpaid COD balance, record it as a payment transaction
             yield onOrderDelivered(order, (_e = payload.cod_amount) !== null && _e !== void 0 ? _e : existing.cod_amount);
         }
         const updated = yield prisma_1.prisma.order.update({

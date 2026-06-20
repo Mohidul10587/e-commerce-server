@@ -1,30 +1,43 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
 import { io } from "../../index";
-
+import dotenv from "dotenv";
+dotenv.config();
 export const steadfastWebhookRouter = Router();
 
-const WEBHOOK_OK = { status: "success", message: "Webhook received successfully." };
+const WEBHOOK_OK = {
+  status: "success",
+  message: "Webhook received successfully.",
+};
 
-steadfastWebhookRouter.post("/steadfast", async (req: Request, res: Response) => {
-  const payload = req.body;
-
-  if (!payload || !payload.notification_type) {
-    return res.status(200).json(WEBHOOK_OK); // respond 200 even for unknown payloads
-  }
-
-  try {
-    if (payload.notification_type === "delivery_status") {
-      await handleDeliveryStatus(payload);
-    } else if (payload.notification_type === "tracking_update") {
-      await handleTrackingUpdate(payload);
+steadfastWebhookRouter.post(
+  "/steadfast",
+  async (req: Request, res: Response) => {
+    const token =
+      req.headers["x-steadfast-token"] ?? req.headers["authorization"];
+    if (token !== process.env.STEADFAST_WEBHOOK_TOKEN) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
-  } catch (err: any) {
-    console.error("[Webhook] steadfast processing error:", err.message);
-  }
 
-  return res.status(200).json(WEBHOOK_OK);
-});
+    const payload = req.body;
+
+    if (!payload || !payload.notification_type) {
+      return res.status(200).json(WEBHOOK_OK);
+    }
+
+    try {
+      if (payload.notification_type === "delivery_status") {
+        await handleDeliveryStatus(payload);
+      } else if (payload.notification_type === "tracking_update") {
+        await handleTrackingUpdate(payload);
+      }
+    } catch (err: any) {
+      console.error("[Webhook] steadfast processing error:", err.message);
+    }
+
+    return res.status(200).json(WEBHOOK_OK);
+  }
+);
 
 async function findOrderByCid(consignment_id: number | string) {
   // Prisma JSON filter for PostgreSQL jsonb
@@ -49,7 +62,10 @@ async function handleDeliveryStatus(payload: {
 }) {
   const order = await findOrderByCid(payload.consignment_id);
   if (!order) {
-    console.warn("[Webhook] delivery_status: order not found for cid", payload.consignment_id);
+    console.warn(
+      "[Webhook] delivery_status: order not found for cid",
+      payload.consignment_id
+    );
     return;
   }
 
@@ -65,9 +81,26 @@ async function handleDeliveryStatus(payload: {
 
   const orderUpdate: any = { courier: courierUpdate };
 
+  const statusMap: Record<string, string> = {
+    in_review: "InReview",
+    pending: "Pending",
+    delivered: "Delivered",
+    partial_delivered: "PartlyDelivered",
+    cancelled: "Cancel",
+    hold: "CourierHold",
+    delivered_approval_pending: "DeliveredApprovalPending",
+    partial_delivered_approval_pending: "PartialDeliveredApprovalPending",
+    cancelled_approval_pending: "CancelledApprovalPending",
+    unknown_approval_pending: "UnknownApprovalPending",
+    unknown: "CourierUnknown",
+  };
+
+  const mappedStatus = statusMap[payload.status];
+  if (mappedStatus) {
+    orderUpdate.status = mappedStatus;
+  }
+
   if (payload.status === "delivered") {
-    orderUpdate.status = "Delivered";
-    // On delivery: if order has unpaid COD balance, record it as a payment transaction
     await onOrderDelivered(order, payload.cod_amount ?? existing.cod_amount);
   }
 
@@ -115,7 +148,10 @@ async function handleTrackingUpdate(payload: {
 }) {
   const order = await findOrderByCid(payload.consignment_id);
   if (!order) {
-    console.warn("[Webhook] tracking_update: order not found for cid", payload.consignment_id);
+    console.warn(
+      "[Webhook] tracking_update: order not found for cid",
+      payload.consignment_id
+    );
     return;
   }
 
