@@ -16,6 +16,8 @@ import { inventoryRoutes } from "./app/inventory/inventory.routes";
 import { financeRoutes } from "./app/finance/finance.routes";
 import { expenseRoutes } from "./app/expense/expense.routes";
 import { payrollRoutes } from "./app/payroll/payroll.routes";
+import { courierRoutes } from "./app/courier/courier.routes";
+import { steadfastWebhookRouter } from "./app/courier/steadfast.webhook";
 
 dotenv.config();
 
@@ -59,6 +61,8 @@ app.use("/inventory", inventoryRoutes);
 app.use("/finances", financeRoutes);
 app.use("/expenses", expenseRoutes);
 app.use("/payroll", payrollRoutes);
+app.use("/courier", courierRoutes);
+app.use("/webhooks", steadfastWebhookRouter);
 
 app.use(errorHandler);
 

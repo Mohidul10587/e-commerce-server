@@ -12,6 +12,28 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.assignDesigner = exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
+const steadfast_service_1 = require("../courier/steadfast.service");
+const GROUP_A = new Set([
+    "Processing",
+    "WaitForDesign",
+    "DesignSubmitted",
+    "Revision",
+    "CustomerInformed",
+    "NeedToCall",
+    "NoResponse",
+    "UrgentDesign",
+    "Problem",
+    "OnHold",
+    "NotInterested",
+]);
+const GROUP_B = new Set([
+    "Cancel",
+    "InProduction",
+    "InReview",
+    "Pending",
+    "Delivered",
+    "PartlyDelivered",
+]);
 const VALID_STATUSES = [
     "Processing",
     "WaitForDesign",
@@ -20,6 +42,10 @@ const VALID_STATUSES = [
     "CustomerInformed",
     "NeedToCall",
     "NoResponse",
+    "UrgentDesign",
+    "Problem",
+    "OnHold",
+    "NotInterested",
     "OrderConfirmed",
     "InProduction",
     "InReview",
@@ -179,16 +205,25 @@ const getOrderById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.getOrderById = getOrderById;
 const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
         const { status } = req.body;
         const id = Number(req.params.id);
+        if (!VALID_STATUSES.includes(status)) {
+            return res.status(400).json({ message: "Invalid status" });
+        }
         const existing = yield prisma_1.prisma.order.findUniqueOrThrow({
             where: { id },
             include: { items: true },
         });
+        const from = existing.status;
+        // Block: Group A → Group B directly (must go through OrderConfirmed)
+        if (GROUP_A.has(from) && GROUP_B.has(status)) {
+            return res.status(400).json({ message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.` });
+        }
         yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
             var _a, _b;
-            // Confirm → deduct stock (only once)
+            // OrderConfirmed → deduct stock (only once)
             if (status === "OrderConfirmed" && !existing.stockDeducted) {
                 for (const item of existing.items) {
                     const variant = yield tx.productVariant.findUnique({
@@ -209,8 +244,8 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 }
                 yield tx.order.update({ where: { id }, data: { stockDeducted: true } });
             }
-            // Cancel → restore stock (only if already deducted)
-            if (status === "Cancel" && existing.stockDeducted) {
+            // Post-confirmation → Group A: restore stock if previously deducted
+            if (GROUP_A.has(status) && existing.stockDeducted) {
                 for (const item of existing.items) {
                     const variant = yield tx.productVariant.findUnique({
                         where: { id: item.variantId },
@@ -223,7 +258,7 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
                         data: { stock: { increment: item.quantity } },
                     });
                     yield tx.stockHistory.create({
-                        data: { variantId: item.variantId, action: "RETURN", quantity: item.quantity, note: `Order #${id} cancelled` },
+                        data: { variantId: item.variantId, action: "RETURN", quantity: item.quantity, note: `Order #${id} returned to ${status}` },
                     });
                     const agg = yield tx.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { stock: true } });
                     yield tx.product.update({ where: { id: variant.productId }, data: { totalStock: (_b = agg._sum.stock) !== null && _b !== void 0 ? _b : 0 } });
@@ -236,11 +271,44 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
             }
             yield tx.order.update({ where: { id }, data: extraData });
         }));
-        const order = yield prisma_1.prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
+        let order = yield prisma_1.prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
+        // Auto-create SteadFast consignment on InReview (only once)
+        if (status === "InReview" && !((_a = order.courier) === null || _a === void 0 ? void 0 : _a.consignment_id)) {
+            try {
+                const invoice = `ORD-${id}`;
+                const consignment = yield (0, steadfast_service_1.createConsignment)({
+                    invoice,
+                    recipient_name: order.customerName,
+                    recipient_phone: order.customerPhone,
+                    recipient_address: order.address,
+                    cod_amount: order.total,
+                    note: (_b = order.note) !== null && _b !== void 0 ? _b : undefined,
+                });
+                const courierData = {
+                    provider: "steadfast",
+                    consignment_id: consignment.consignment_id,
+                    tracking_code: consignment.tracking_code,
+                    invoice: consignment.invoice,
+                    status: consignment.status,
+                    cod_amount: consignment.cod_amount,
+                    delivery_charge: null,
+                    last_update: new Date().toISOString(),
+                };
+                order = yield prisma_1.prisma.order.update({
+                    where: { id },
+                    data: { courier: courierData },
+                    include: { items: true },
+                });
+            }
+            catch (courierErr) {
+                console.error(`[Courier] Failed to create consignment for order #${id}:`, courierErr.message);
+                // Non-fatal: order status is already updated; log and continue
+            }
+        }
         index_1.io.emit("order:updated", order);
         return res.json({ order });
     }
-    catch (_a) {
+    catch (_c) {
         return res.status(500).json({ message: "Internal server error" });
     }
 });

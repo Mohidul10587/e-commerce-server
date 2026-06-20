@@ -141,6 +141,10 @@ enum OrderStatus {
   CustomerInformed
   NeedToCall
   NoResponse
+  UrgentDesign
+  Problem
+  OnHold
+  NotInterested
   OrderConfirmed
   InProduction
   InReview
@@ -177,6 +181,7 @@ model Order {
   stockDeducted       Boolean       @default(false)
   note                String?
   contactLink         String?
+  courier             Json?
   // assignedDesignerId  Int?  // Temporarily commented - column doesn't exist in DB
   transactions        PaymentTransaction[]
   createdAt           DateTime      @default(now())

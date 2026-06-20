@@ -1,6 +1,30 @@
 import { Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
 import { io } from "../../index";
+import { createConsignment } from "../courier/steadfast.service";
+
+const GROUP_A = new Set([
+  "Processing",
+  "WaitForDesign",
+  "DesignSubmitted",
+  "Revision",
+  "CustomerInformed",
+  "NeedToCall",
+  "NoResponse",
+  "UrgentDesign",
+  "Problem",
+  "OnHold",
+  "NotInterested",
+]);
+
+const GROUP_B = new Set([
+  "Cancel",
+  "InProduction",
+  "InReview",
+  "Pending",
+  "Delivered",
+  "PartlyDelivered",
+]);
 
 const VALID_STATUSES = [
   "Processing",
@@ -10,6 +34,10 @@ const VALID_STATUSES = [
   "CustomerInformed",
   "NeedToCall",
   "NoResponse",
+  "UrgentDesign",
+  "Problem",
+  "OnHold",
+  "NotInterested",
   "OrderConfirmed",
   "InProduction",
   "InReview",
@@ -211,13 +239,24 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     const { status } = req.body;
     const id = Number(req.params.id);
 
+    if (!VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+
     const existing = await prisma.order.findUniqueOrThrow({
       where: { id },
       include: { items: true },
     });
 
+    const from = existing.status;
+
+    // Block: Group A → Group B directly (must go through OrderConfirmed)
+    if (GROUP_A.has(from) && GROUP_B.has(status)) {
+      return res.status(400).json({ message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.` });
+    }
+
     await prisma.$transaction(async (tx) => {
-      // Confirm → deduct stock (only once)
+      // OrderConfirmed → deduct stock (only once)
       if (status === "OrderConfirmed" && !existing.stockDeducted) {
         for (const item of existing.items) {
           const variant = await tx.productVariant.findUnique({
@@ -238,8 +277,8 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
         await tx.order.update({ where: { id }, data: { stockDeducted: true } });
       }
 
-      // Cancel → restore stock (only if already deducted)
-      if (status === "Cancel" && existing.stockDeducted) {
+      // Post-confirmation → Group A: restore stock if previously deducted
+      if (GROUP_A.has(status) && existing.stockDeducted) {
         for (const item of existing.items) {
           const variant = await tx.productVariant.findUnique({
             where: { id: item.variantId },
@@ -251,7 +290,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
             data: { stock: { increment: item.quantity } },
           });
           await tx.stockHistory.create({
-            data: { variantId: item.variantId, action: "RETURN", quantity: item.quantity, note: `Order #${id} cancelled` },
+            data: { variantId: item.variantId, action: "RETURN", quantity: item.quantity, note: `Order #${id} returned to ${status}` },
           });
           const agg = await tx.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { stock: true } });
           await tx.product.update({ where: { id: variant.productId }, data: { totalStock: agg._sum.stock ?? 0 } });
@@ -266,7 +305,41 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       await tx.order.update({ where: { id }, data: extraData });
     });
 
-    const order = await prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
+    let order = await prisma.order.findUniqueOrThrow({ where: { id }, include: { items: true } });
+
+    // Auto-create SteadFast consignment on InReview (only once)
+    if (status === "InReview" && !(order.courier as any)?.consignment_id) {
+      try {
+        const invoice = `ORD-${id}`;
+        const consignment = await createConsignment({
+          invoice,
+          recipient_name: order.customerName,
+          recipient_phone: order.customerPhone,
+          recipient_address: order.address,
+          cod_amount: order.total,
+          note: order.note ?? undefined,
+        });
+        const courierData = {
+          provider: "steadfast",
+          consignment_id: consignment.consignment_id,
+          tracking_code: consignment.tracking_code,
+          invoice: consignment.invoice,
+          status: consignment.status,
+          cod_amount: consignment.cod_amount,
+          delivery_charge: null,
+          last_update: new Date().toISOString(),
+        };
+        order = await prisma.order.update({
+          where: { id },
+          data: { courier: courierData },
+          include: { items: true },
+        });
+      } catch (courierErr: any) {
+        console.error(`[Courier] Failed to create consignment for order #${id}:`, courierErr.message);
+        // Non-fatal: order status is already updated; log and continue
+      }
+    }
+
     io.emit("order:updated", order);
     return res.json({ order });
   } catch {
