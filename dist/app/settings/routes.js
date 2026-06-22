@@ -11,3 +11,9 @@ router.get("/", controller_1.getSettings);
 router.put("/", auth_1.verifyAdminOrManager, controller_1.updateSettings);
 router.post("/banners", auth_1.verifyAdmin, controller_1.addBanner);
 router.delete("/banners/:id", auth_1.verifyAdmin, controller_1.deleteBanner);
+// Facebook settings (Admin only)
+router.get("/facebook", controller_1.getFacebookSettings);
+router.post("/facebook", auth_1.verifyAdmin, controller_1.updateFacebookSettings);
+// WhatsApp settings (Admin only)
+router.get("/whatsapp", controller_1.getWhatsAppSettings);
+router.post("/whatsapp", auth_1.verifyAdmin, controller_1.updateWhatsAppSettings);

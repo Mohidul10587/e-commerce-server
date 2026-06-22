@@ -82,3 +82,79 @@ export async function deleteBanner(req: Request, res: Response) {
     return res.status(500).json({ message: "Server error", error });
   }
 }
+
+export async function getFacebookSettings(_req: Request, res: Response) {
+  try {
+    const s = await getOrCreateSettings();
+    return res.json({
+      pixelId: s.fbPixelId || "",
+      accessToken: s.fbAccessToken || "",
+      enabled: s.fbPixelEnabled || false,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
+export async function updateFacebookSettings(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const s = await getOrCreateSettings();
+    const { pixelId, accessToken, enabled } = req.body;
+    
+    const updated = await prisma.generalSettings.update({
+      where: { id: s.id },
+      data: {
+        fbPixelId: pixelId || null,
+        fbAccessToken: accessToken || null,
+        fbPixelEnabled: enabled || false,
+      },
+    });
+
+    return res.json({ message: "Facebook settings updated", settings: {
+      pixelId: updated.fbPixelId || "",
+      accessToken: updated.fbAccessToken || "",
+      enabled: updated.fbPixelEnabled || false,
+    }});
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
+export async function getWhatsAppSettings(_req: Request, res: Response) {
+  try {
+    const s = await getOrCreateSettings();
+    return res.json({
+      apiUrl: s.whatsappApiUrl || "",
+      apiToken: s.whatsappApiToken || "",
+      enabled: s.whatsappEnabled || false,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
+export async function updateWhatsAppSettings(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const s = await getOrCreateSettings();
+    const { apiUrl, apiToken, enabled } = req.body;
+    
+    const updated = await prisma.generalSettings.update({
+      where: { id: s.id },
+      data: {
+        whatsappApiUrl: apiUrl || null,
+        whatsappApiToken: apiToken || null,
+        whatsappEnabled: enabled || false,
+      },
+    });
+
+    return res.json({ message: "WhatsApp settings updated", settings: {
+      apiUrl: updated.whatsappApiUrl || "",
+      apiToken: updated.whatsappApiToken || "",
+      enabled: updated.whatsappEnabled || false,
+    }});
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}

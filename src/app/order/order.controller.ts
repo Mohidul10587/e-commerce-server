@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
 import { io } from "../../index";
 import { createConsignment } from "../courier/steadfast.service";
+import { sendOrderConfirmationWhatsApp } from "../../lib/whatsapp.service";
 
 const GROUP_A = new Set([
   "Processing",
@@ -156,6 +157,25 @@ export const createOrder = async (req: Request, res: Response) => {
 
     io.emit("order:new", order);
 
+    // Send WhatsApp confirmation message
+    try {
+      await sendOrderConfirmationWhatsApp({
+        orderId: String(order.id),
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        items: order.items.map((item) => ({
+          title: item.title,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        total: order.total,
+        address: order.address,
+      });
+    } catch (whatsappError) {
+      console.error("WhatsApp message failed:", whatsappError);
+      // Don't fail the order if WhatsApp fails
+    }
+
     return res
       .status(201)
       .json({ message: "Order placed successfully", order });
@@ -196,7 +216,8 @@ export const getOrders = async (req: Request, res: Response) => {
       where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
     }
     if (payment) where.paymentStatus = payment;
-    if (assignedDesignerId) where.assignedDesignerId = parseInt(assignedDesignerId as string);
+    if (assignedDesignerId)
+      where.assignedDesignerId = parseInt(assignedDesignerId as string);
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = parseInt(limit as string);
@@ -258,11 +279,9 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 
     // Block: Group A → Group B directly (must go through OrderConfirmed)
     if (GROUP_A.has(from) && GROUP_B.has(status)) {
-      return res
-        .status(400)
-        .json({
-          message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.`,
-        });
+      return res.status(400).json({
+        message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.`,
+      });
     }
 
     await prisma.$transaction(async (tx) => {
@@ -945,7 +964,9 @@ export const bulkAssignDesigner = async (req: Request, res: Response) => {
   try {
     const { ids, designerId } = req.body;
     if (!Array.isArray(ids) || ids.length === 0 || !designerId) {
-      return res.status(400).json({ message: "ids and designerId are required" });
+      return res
+        .status(400)
+        .json({ message: "ids and designerId are required" });
     }
     await prisma.order.updateMany({
       where: { id: { in: ids.map(Number) } },
@@ -1006,8 +1027,14 @@ export const designerSubmitDesign = async (req: Request, res: Response) => {
     if (!existing) return res.status(404).json({ message: "Order not found" });
     if (existing.assignedDesignerId !== requesterId)
       return res.status(403).json({ message: "Not assigned to you" });
-    if (!["WaitForDesign", "Revision", "UrgentDesign"].includes(existing.status as string))
-      return res.status(400).json({ message: "Order is not in a design stage" });
+    if (
+      !["WaitForDesign", "Revision", "UrgentDesign"].includes(
+        existing.status as string
+      )
+    )
+      return res
+        .status(400)
+        .json({ message: "Order is not in a design stage" });
 
     const order = await prisma.order.update({
       where: { id },

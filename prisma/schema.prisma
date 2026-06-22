@@ -72,6 +72,14 @@ model GeneralSettings {
   deliveryFree            Boolean  @default(false)
   deliveryInsideDhaka     Float    @default(60)
   deliveryOutsideDhaka    Float    @default(120)
+  // Facebook Pixel Settings
+  fbPixelId       String?
+  fbAccessToken   String?
+  fbPixelEnabled  Boolean  @default(false)
+  // WhatsApp Settings
+  whatsappApiUrl    String?
+  whatsappApiToken  String?
+  whatsappEnabled   Boolean  @default(false)
   banners         Banner[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

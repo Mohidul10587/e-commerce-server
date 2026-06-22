@@ -13,6 +13,7 @@ exports.designerSubmitDesign = exports.getOrderForDesigner = exports.bulkAssignD
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
 const steadfast_service_1 = require("../courier/steadfast.service");
+const whatsapp_service_1 = require("../../lib/whatsapp.service");
 const GROUP_A = new Set([
     "Processing",
     "WaitForDesign",
@@ -135,6 +136,25 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             include: { items: true },
         });
         index_1.io.emit("order:new", order);
+        // Send WhatsApp confirmation message
+        try {
+            yield (0, whatsapp_service_1.sendOrderConfirmationWhatsApp)({
+                orderId: String(order.id),
+                customerName: order.customerName,
+                customerPhone: order.customerPhone,
+                items: order.items.map((item) => ({
+                    title: item.title,
+                    quantity: item.quantity,
+                    price: item.price,
+                })),
+                total: order.total,
+                address: order.address,
+            });
+        }
+        catch (whatsappError) {
+            console.error("WhatsApp message failed:", whatsappError);
+            // Don't fail the order if WhatsApp fails
+        }
         return res
             .status(201)
             .json({ message: "Order placed successfully", order });
@@ -226,9 +246,7 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
         const from = existing.status;
         // Block: Group A → Group B directly (must go through OrderConfirmed)
         if (GROUP_A.has(from) && GROUP_B.has(status)) {
-            return res
-                .status(400)
-                .json({
+            return res.status(400).json({
                 message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.`,
             });
         }
@@ -880,7 +898,9 @@ const bulkAssignDesigner = (req, res) => __awaiter(void 0, void 0, void 0, funct
     try {
         const { ids, designerId } = req.body;
         if (!Array.isArray(ids) || ids.length === 0 || !designerId) {
-            return res.status(400).json({ message: "ids and designerId are required" });
+            return res
+                .status(400)
+                .json({ message: "ids and designerId are required" });
         }
         yield prisma_1.prisma.order.updateMany({
             where: { id: { in: ids.map(Number) } },
@@ -944,7 +964,9 @@ const designerSubmitDesign = (req, res) => __awaiter(void 0, void 0, void 0, fun
         if (existing.assignedDesignerId !== requesterId)
             return res.status(403).json({ message: "Not assigned to you" });
         if (!["WaitForDesign", "Revision", "UrgentDesign"].includes(existing.status))
-            return res.status(400).json({ message: "Order is not in a design stage" });
+            return res
+                .status(400)
+                .json({ message: "Order is not in a design stage" });
         const order = yield prisma_1.prisma.order.update({
             where: { id },
             data: { status: "DesignSubmitted" },
