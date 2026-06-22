@@ -87,20 +87,31 @@ model Banner {
 }
 
 model Product {
-  id             Int              @id @default(autoincrement())
-  title          String
-  slug           String           @unique
-  description    String?
-  seoTitle       String?
-  seoDescription String?
-  keywords       String[]
-  type           ProductType
-  totalStock     Int              @default(0)
-  isTrashed      Boolean          @default(false)
-  isFreeGift     Boolean          @default(false)
-  variants       ProductVariant[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id                       Int              @id @default(autoincrement())
+  title                    String
+  slug                     String           @unique
+  description              String?
+  seoTitle                 String?
+  seoDescription           String?
+  keywords                 String[]
+  type                     ProductType
+  totalStock               Int              @default(0)
+  isTrashed                Boolean          @default(false)
+  isFreeGift               Boolean          @default(false)
+  headingText              String?
+  youtubeVideoUrl          String?
+  designSampleImageUrls    String[]
+  qna                      Json?
+  forWhom                  String[]
+  forWhomHeading           String?
+  forWhomDescription       String?
+  whyNeeded                String[]
+  whyNeededHeading         String?
+  whyNeededDescription     String?
+  customerReviewImageUrls  String[]
+  variants                 ProductVariant[]
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
 }
 
 model ProductVariant {

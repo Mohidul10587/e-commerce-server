@@ -22,6 +22,11 @@ export interface CreateProductInput {
   keywords?: string[];
   type: "seal" | "ink";
   isActive?: boolean;
+  headingText?: string;
+  youtubeVideoUrl?: string;
+  designSampleImageUrls?: string[];
+  qna?: { q: string; a: string }[];
+  customerReviewImageUrls?: string[];
   variants: VariantInput[];
 }
 
