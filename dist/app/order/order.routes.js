@@ -13,6 +13,7 @@ exports.orderRoutes.use(auth_1.verifyAdminManagerSupportDesignerOrProduction);
 exports.orderRoutes.post("/bulk/trash", auth_1.verifyAdminManagerOrSupport, order_controller_1.bulkTrashOrders);
 exports.orderRoutes.post("/bulk/restore", auth_1.verifyAdminManagerOrSupport, order_controller_1.bulkRestoreOrders);
 exports.orderRoutes.post("/bulk/status", auth_1.verifyAdminManagerOrSupport, order_controller_1.bulkUpdateOrderStatus);
+exports.orderRoutes.post("/bulk/assign-designer", auth_1.verifyAdminManagerOrSupport, order_controller_1.bulkAssignDesigner);
 // Item-level routes
 exports.orderRoutes.patch("/items/:itemId/seal-text", auth_1.verifyAdminManagerOrSupport, order_controller_1.updateOrderItemSealText);
 exports.orderRoutes.patch("/items/:itemId/quantity", auth_1.verifyAdminManagerOrSupport, order_controller_1.updateOrderItemQuantity);
@@ -20,6 +21,8 @@ exports.orderRoutes.patch("/items/:itemId/variant", auth_1.verifyAdminManagerOrS
 exports.orderRoutes.delete("/items/:itemId", auth_1.verifyAdminManagerOrSupport, order_controller_1.removeOrderItem);
 exports.orderRoutes.get("/counts", order_controller_1.getOrderStatusCounts);
 exports.orderRoutes.get("/", order_controller_1.getOrders);
+exports.orderRoutes.get("/:id/designer-view", auth_1.verifyUser, order_controller_1.getOrderForDesigner);
+exports.orderRoutes.patch("/:id/designer-submit", auth_1.verifyUser, order_controller_1.designerSubmitDesign);
 exports.orderRoutes.get("/:id", order_controller_1.getOrderById);
 exports.orderRoutes.patch("/:id/status", auth_1.verifyAdminManagerOrSupport, order_controller_1.updateOrderStatus);
 exports.orderRoutes.patch("/:id/assign-designer", auth_1.verifyAdminManagerSupportOrDesigner, order_controller_1.assignDesigner);

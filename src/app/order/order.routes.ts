@@ -6,9 +6,10 @@ import {
   updateOrderItemSealText, addOrderItem, removeOrderItem, updateOrderItemQuantity, updateOrderItemVariant,
   bulkTrashOrders, bulkRestoreOrders, bulkUpdateOrderStatus,
   getOrderStatusCounts, getOrderPayments, deleteOrderPayment, updateOrderPaymentTx,
-  assignDesigner,
+  assignDesigner, bulkAssignDesigner,
+  getOrderForDesigner, designerSubmitDesign,
 } from "./order.controller";
-import { verifyAdminManagerSupportDesignerOrProduction, verifyAdminManagerOrSupport, verifyAdminManagerSupportOrDesigner, verifyAdmin } from "../../middleware/auth";
+import { verifyAdminManagerSupportDesignerOrProduction, verifyAdminManagerOrSupport, verifyAdminManagerSupportOrDesigner, verifyAdmin, verifyUser } from "../../middleware/auth";
 
 export const orderRoutes = Router();
 
@@ -22,6 +23,7 @@ orderRoutes.use(verifyAdminManagerSupportDesignerOrProduction);
 orderRoutes.post("/bulk/trash", verifyAdminManagerOrSupport, bulkTrashOrders);
 orderRoutes.post("/bulk/restore", verifyAdminManagerOrSupport, bulkRestoreOrders);
 orderRoutes.post("/bulk/status", verifyAdminManagerOrSupport, bulkUpdateOrderStatus);
+orderRoutes.post("/bulk/assign-designer", verifyAdminManagerOrSupport, bulkAssignDesigner);
 
 // Item-level routes
 orderRoutes.patch("/items/:itemId/seal-text", verifyAdminManagerOrSupport, updateOrderItemSealText);
@@ -31,6 +33,8 @@ orderRoutes.delete("/items/:itemId", verifyAdminManagerOrSupport, removeOrderIte
 
 orderRoutes.get("/counts", getOrderStatusCounts);
 orderRoutes.get("/", getOrders);
+orderRoutes.get("/:id/designer-view", verifyUser, getOrderForDesigner);
+orderRoutes.patch("/:id/designer-submit", verifyUser, designerSubmitDesign);
 orderRoutes.get("/:id", getOrderById);
 orderRoutes.patch("/:id/status", verifyAdminManagerOrSupport, updateOrderStatus);
 orderRoutes.patch("/:id/assign-designer", verifyAdminManagerSupportOrDesigner, assignDesigner);

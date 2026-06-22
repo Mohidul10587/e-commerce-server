@@ -43,6 +43,7 @@ model User {
   ta          Float    @default(0)
   bonus       Float    @default(0)
   createdAt   DateTime @default(now())
+  assignedOrders Order[] @relation("DesignerOrders")
 }
 
 model GeneralSettings {
@@ -201,6 +202,7 @@ model Order {
   contactLink         String?
   courier             Json?
   assignedDesignerId  Int?
+  assignedDesigner    User?  @relation("DesignerOrders", fields: [assignedDesignerId], references: [id])
   transactions        PaymentTransaction[]
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt

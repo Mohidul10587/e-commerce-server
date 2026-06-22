@@ -205,7 +205,10 @@ export const getOrders = async (req: Request, res: Response) => {
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
         where,
-        include: { items: true },
+        include: {
+          items: true,
+          assignedDesigner: { select: { id: true, name: true } },
+        },
         orderBy: { createdAt: orderDir },
         skip,
         take,
@@ -933,6 +936,87 @@ export const assignDesigner = async (req: Request, res: Response) => {
     });
     io.emit("order:updated", order);
     return res.json({ order });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const bulkAssignDesigner = async (req: Request, res: Response) => {
+  try {
+    const { ids, designerId } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0 || !designerId) {
+      return res.status(400).json({ message: "ids and designerId are required" });
+    }
+    await prisma.order.updateMany({
+      where: { id: { in: ids.map(Number) } },
+      data: { assignedDesignerId: Number(designerId) },
+    });
+    io.emit("order:updated", {});
+    return res.json({ message: `${ids.length} orders assigned` });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Designer-only: get order details without sensitive info (no price, no customer info)
+export const getOrderForDesigner = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    // @ts-ignore
+    const requesterId = req.user?.id;
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        note: true,
+        createdAt: true,
+        assignedDesignerId: true,
+        items: {
+          select: {
+            id: true,
+            title: true,
+            quantity: true,
+            sealText: true,
+            isFreeItem: true,
+          },
+        },
+      },
+    });
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.assignedDesignerId !== requesterId)
+      return res.status(403).json({ message: "Not assigned to you" });
+
+    return res.json({ order });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Designer-only: submit design (WaitForDesign/Revision → DesignSubmitted)
+export const designerSubmitDesign = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    // @ts-ignore
+    const requesterId = req.user?.id;
+
+    const existing = await prisma.order.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ message: "Order not found" });
+    if (existing.assignedDesignerId !== requesterId)
+      return res.status(403).json({ message: "Not assigned to you" });
+    if (!["WaitForDesign", "Revision", "UrgentDesign"].includes(existing.status as string))
+      return res.status(400).json({ message: "Order is not in a design stage" });
+
+    const order = await prisma.order.update({
+      where: { id },
+      data: { status: "DesignSubmitted" },
+      include: { items: true },
+    });
+
+    io.emit("order:updated", order);
+    return res.json({ message: "Design submitted", order });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
   }

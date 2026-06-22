@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.assignDesigner = exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
+exports.designerSubmitDesign = exports.getOrderForDesigner = exports.bulkAssignDesigner = exports.assignDesigner = exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
 const steadfast_service_1 = require("../courier/steadfast.service");
@@ -174,7 +174,10 @@ const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const [orders, total] = yield Promise.all([
             prisma_1.prisma.order.findMany({
                 where,
-                include: { items: true },
+                include: {
+                    items: true,
+                    assignedDesigner: { select: { id: true, name: true } },
+                },
                 orderBy: { createdAt: orderDir },
                 skip,
                 take,
@@ -873,3 +876,85 @@ const assignDesigner = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.assignDesigner = assignDesigner;
+const bulkAssignDesigner = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { ids, designerId } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0 || !designerId) {
+            return res.status(400).json({ message: "ids and designerId are required" });
+        }
+        yield prisma_1.prisma.order.updateMany({
+            where: { id: { in: ids.map(Number) } },
+            data: { assignedDesignerId: Number(designerId) },
+        });
+        index_1.io.emit("order:updated", {});
+        return res.json({ message: `${ids.length} orders assigned` });
+    }
+    catch (_a) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.bulkAssignDesigner = bulkAssignDesigner;
+// Designer-only: get order details without sensitive info (no price, no customer info)
+const getOrderForDesigner = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const id = Number(req.params.id);
+        // @ts-ignore
+        const requesterId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const order = yield prisma_1.prisma.order.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                status: true,
+                note: true,
+                createdAt: true,
+                assignedDesignerId: true,
+                items: {
+                    select: {
+                        id: true,
+                        title: true,
+                        quantity: true,
+                        sealText: true,
+                        isFreeItem: true,
+                    },
+                },
+            },
+        });
+        if (!order)
+            return res.status(404).json({ message: "Order not found" });
+        if (order.assignedDesignerId !== requesterId)
+            return res.status(403).json({ message: "Not assigned to you" });
+        return res.json({ order });
+    }
+    catch (_b) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.getOrderForDesigner = getOrderForDesigner;
+// Designer-only: submit design (WaitForDesign/Revision → DesignSubmitted)
+const designerSubmitDesign = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const id = Number(req.params.id);
+        // @ts-ignore
+        const requesterId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const existing = yield prisma_1.prisma.order.findUnique({ where: { id } });
+        if (!existing)
+            return res.status(404).json({ message: "Order not found" });
+        if (existing.assignedDesignerId !== requesterId)
+            return res.status(403).json({ message: "Not assigned to you" });
+        if (!["WaitForDesign", "Revision", "UrgentDesign"].includes(existing.status))
+            return res.status(400).json({ message: "Order is not in a design stage" });
+        const order = yield prisma_1.prisma.order.update({
+            where: { id },
+            data: { status: "DesignSubmitted" },
+            include: { items: true },
+        });
+        index_1.io.emit("order:updated", order);
+        return res.json({ message: "Design submitted", order });
+    }
+    catch (_b) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.designerSubmitDesign = designerSubmitDesign;
