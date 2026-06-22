@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import prisma from "../../lib/prisma";
 import { localDayRange } from "../../lib/dateRange";
 
-const LOW_STOCK_THRESHOLD = 5;
+const LOW_STOCK_THRESHOLD = 5; // fallback only for variants without product threshold
 
 export async function getInventoryStats(_req: Request, res: Response) {
   try {
@@ -20,7 +20,7 @@ export async function getInventoryStats(_req: Request, res: Response) {
       totalProducts,
       stockHistory,
       purchases,
-      lowStockProducts,
+      allProductsForLowStock,
       outOfStockProducts,
     ] = await Promise.all([
       prisma.productVariant.findMany({
@@ -42,27 +42,17 @@ export async function getInventoryStats(_req: Request, res: Response) {
         },
       }),
       prisma.product.findMany({
-        where: {
-          isTrashed: false,
-          variants: {
-            some: {
-              isActive: true,
-              stock: { gt: 0, lte: LOW_STOCK_THRESHOLD },
-            },
-          },
-        },
+        where: { isTrashed: false, totalStock: { gt: 0 } },
         select: {
           id: true,
           title: true,
+          lowStockThreshold: true,
+          totalStock: true,
           variants: {
-            where: {
-              isActive: true,
-              stock: { gt: 0, lte: LOW_STOCK_THRESHOLD },
-            },
+            where: { isActive: true, stock: { gt: 0 } },
             select: { id: true, title: true, sku: true, stock: true },
           },
         },
-        take: 10,
       }),
       prisma.product.findMany({
         where: {
@@ -89,6 +79,18 @@ export async function getInventoryStats(_req: Request, res: Response) {
     );
     const totalVariants = variants.length;
     const uniqueProductIds = new Set(variants.map((v) => v.productId)).size;
+
+    // Filter low stock using per-product threshold
+    const lowStockProducts = allProductsForLowStock
+      .map((p: any) => ({
+        ...p,
+        variants: p.variants.filter((v: any) => {
+          const threshold = p.lowStockThreshold > 0 ? p.lowStockThreshold : LOW_STOCK_THRESHOLD;
+          return v.stock > 0 && v.stock <= threshold;
+        }),
+      }))
+      .filter((p: any) => p.variants.length > 0)
+      .slice(0, 10);
 
     // Stock movement helpers
     function movement(
@@ -194,14 +196,10 @@ export async function getStockList(req: Request, res: Response) {
     // filter by stock status if provided
     const filtered = stockStatus
       ? products.filter((p) => {
-          if (stockStatus === "out")
-            return p.variants.some((v) => v.stock === 0);
-          if (stockStatus === "low")
-            return p.variants.some(
-              (v) => v.stock > 0 && v.stock <= LOW_STOCK_THRESHOLD
-            );
-          if (stockStatus === "in")
-            return p.variants.some((v) => v.stock > LOW_STOCK_THRESHOLD);
+          const threshold = p.lowStockThreshold > 0 ? p.lowStockThreshold : LOW_STOCK_THRESHOLD;
+          if (stockStatus === "out") return p.variants.some((v) => v.stock === 0);
+          if (stockStatus === "low") return p.variants.some((v) => v.stock > 0 && v.stock <= threshold);
+          if (stockStatus === "in") return p.variants.every((v) => v.stock > threshold);
           return true;
         })
       : products;

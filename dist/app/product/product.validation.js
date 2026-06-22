@@ -24,6 +24,7 @@ exports.createProductSchema = zod_1.z.object({
     seoDescription: zod_1.z.string().optional(),
     keywords: zod_1.z.array(zod_1.z.string()).optional(),
     type: zod_1.z.enum(["seal", "ink"]),
+    lowStockThreshold: zod_1.z.number().int().min(0).optional(),
     isFreeGift: zod_1.z.boolean().optional(),
     headingText: zod_1.z.string().optional(),
     youtubeVideoUrl: zod_1.z.string().optional(),

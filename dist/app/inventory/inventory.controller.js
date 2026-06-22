@@ -19,7 +19,7 @@ exports.getMonthlyChartData = getMonthlyChartData;
 exports.getStockMovementByDateRange = getStockMovementByDateRange;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
 const dateRange_1 = require("../../lib/dateRange");
-const LOW_STOCK_THRESHOLD = 5;
+const LOW_STOCK_THRESHOLD = 5; // fallback only for variants without product threshold
 function getInventoryStats(_req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -31,7 +31,7 @@ function getInventoryStats(_req, res) {
             const monthStart = new Date(now);
             monthStart.setDate(1);
             monthStart.setHours(0, 0, 0, 0);
-            const [variants, totalProducts, stockHistory, purchases, lowStockProducts, outOfStockProducts,] = yield Promise.all([
+            const [variants, totalProducts, stockHistory, purchases, allProductsForLowStock, outOfStockProducts,] = yield Promise.all([
                 prisma_1.default.productVariant.findMany({
                     where: { isActive: true },
                     select: { id: true, stock: true, purchasePrice: true, productId: true },
@@ -51,27 +51,17 @@ function getInventoryStats(_req, res) {
                     },
                 }),
                 prisma_1.default.product.findMany({
-                    where: {
-                        isTrashed: false,
-                        variants: {
-                            some: {
-                                isActive: true,
-                                stock: { gt: 0, lte: LOW_STOCK_THRESHOLD },
-                            },
-                        },
-                    },
+                    where: { isTrashed: false, totalStock: { gt: 0 } },
                     select: {
                         id: true,
                         title: true,
+                        lowStockThreshold: true,
+                        totalStock: true,
                         variants: {
-                            where: {
-                                isActive: true,
-                                stock: { gt: 0, lte: LOW_STOCK_THRESHOLD },
-                            },
+                            where: { isActive: true, stock: { gt: 0 } },
                             select: { id: true, title: true, sku: true, stock: true },
                         },
                     },
-                    take: 10,
                 }),
                 prisma_1.default.product.findMany({
                     where: {
@@ -94,6 +84,14 @@ function getInventoryStats(_req, res) {
             const totalStockValue = variants.reduce((s, v) => s + v.stock * v.purchasePrice, 0);
             const totalVariants = variants.length;
             const uniqueProductIds = new Set(variants.map((v) => v.productId)).size;
+            // Filter low stock using per-product threshold
+            const lowStockProducts = allProductsForLowStock
+                .map((p) => (Object.assign(Object.assign({}, p), { variants: p.variants.filter((v) => {
+                    const threshold = p.lowStockThreshold > 0 ? p.lowStockThreshold : LOW_STOCK_THRESHOLD;
+                    return v.stock > 0 && v.stock <= threshold;
+                }) })))
+                .filter((p) => p.variants.length > 0)
+                .slice(0, 10);
             // Stock movement helpers
             function movement(action, since) {
                 return stockHistory
@@ -183,12 +181,13 @@ function getStockList(req, res) {
             // filter by stock status if provided
             const filtered = stockStatus
                 ? products.filter((p) => {
+                    const threshold = p.lowStockThreshold > 0 ? p.lowStockThreshold : LOW_STOCK_THRESHOLD;
                     if (stockStatus === "out")
                         return p.variants.some((v) => v.stock === 0);
                     if (stockStatus === "low")
-                        return p.variants.some((v) => v.stock > 0 && v.stock <= LOW_STOCK_THRESHOLD);
+                        return p.variants.some((v) => v.stock > 0 && v.stock <= threshold);
                     if (stockStatus === "in")
-                        return p.variants.some((v) => v.stock > LOW_STOCK_THRESHOLD);
+                        return p.variants.every((v) => v.stock > threshold);
                     return true;
                 })
                 : products;

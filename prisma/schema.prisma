@@ -96,6 +96,7 @@ model Product {
   keywords                 String[]
   type                     ProductType
   totalStock               Int              @default(0)
+  lowStockThreshold        Int              @default(0)
   isTrashed                Boolean          @default(false)
   isFreeGift               Boolean          @default(false)
   headingText              String?

@@ -23,6 +23,7 @@ export const createProductSchema = z.object({
   seoDescription: z.string().optional(),
   keywords: z.array(z.string()).optional(),
   type: z.enum(["seal", "ink"]),
+  lowStockThreshold: z.number().int().min(0).optional(),
   isFreeGift: z.boolean().optional(),
   headingText: z.string().optional(),
   youtubeVideoUrl: z.string().optional(),
