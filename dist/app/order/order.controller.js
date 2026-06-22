@@ -928,13 +928,24 @@ const getOrderForDesigner = (req, res) => __awaiter(void 0, void 0, void 0, func
                 status: true,
                 note: true,
                 createdAt: true,
+                customerName: true,
+                customerPhone: true,
+                alternativePhone: true,
+                address: true,
+                subtotal: true,
+                deliveryCharge: true,
+                total: true,
+                discount: true,
+                discountPercent: true,
+                contactLink: true,
                 assignedDesignerId: true,
                 items: {
                     select: {
                         id: true,
                         title: true,
-                        quantity: true,
                         sealText: true,
+                        price: true,
+                        quantity: true,
                         isFreeItem: true,
                     },
                 },
@@ -946,7 +957,8 @@ const getOrderForDesigner = (req, res) => __awaiter(void 0, void 0, void 0, func
             return res.status(403).json({ message: "Not assigned to you" });
         return res.json({ order });
     }
-    catch (_b) {
+    catch (err) {
+        console.error(err);
         return res.status(500).json({ message: "Internal server error" });
     }
 });

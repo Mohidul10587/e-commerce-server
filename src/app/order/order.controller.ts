@@ -993,13 +993,28 @@ export const getOrderForDesigner = async (req: Request, res: Response) => {
         status: true,
         note: true,
         createdAt: true,
+
+        customerName: true,
+        customerPhone: true,
+        alternativePhone: true,
+        address: true,
+
+        subtotal: true,
+        deliveryCharge: true,
+        total: true,
+        discount: true,
+        discountPercent: true,
+
+        contactLink: true,
         assignedDesignerId: true,
+
         items: {
           select: {
             id: true,
             title: true,
-            quantity: true,
             sealText: true,
+            price: true,
+            quantity: true,
             isFreeItem: true,
           },
         },
@@ -1007,11 +1022,13 @@ export const getOrderForDesigner = async (req: Request, res: Response) => {
     });
 
     if (!order) return res.status(404).json({ message: "Order not found" });
+
     if (order.assignedDesignerId !== requesterId)
       return res.status(403).json({ message: "Not assigned to you" });
 
     return res.json({ order });
-  } catch {
+  } catch (err) {
+    console.error(err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
