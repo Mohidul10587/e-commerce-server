@@ -166,7 +166,8 @@ const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         if (payment)
             where.paymentStatus = payment;
-        // if (assignedDesignerId) where.assignedDesignerId = parseInt(assignedDesignerId as string); // Temporarily disabled
+        if (assignedDesignerId)
+            where.assignedDesignerId = parseInt(assignedDesignerId);
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
         const orderDir = sort === "asc" ? "asc" : "desc";
@@ -861,7 +862,7 @@ const assignDesigner = (req, res) => __awaiter(void 0, void 0, void 0, function*
         const { designerId } = req.body; // null to unassign
         const order = yield prisma_1.prisma.order.update({
             where: { id },
-            data: {}, // Temporarily empty - assignedDesignerId field not available
+            data: { assignedDesignerId: designerId !== null && designerId !== void 0 ? designerId : null }, // Temporarily empty - assignedDesignerId field not available
             include: { items: true },
         });
         index_1.io.emit("order:updated", order);
