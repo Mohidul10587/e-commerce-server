@@ -8,17 +8,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
-                t[p[i]] = s[p[i]];
-        }
-    return t;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -27,53 +16,7 @@ exports.getSettings = getSettings;
 exports.updateSettings = updateSettings;
 exports.addBanner = addBanner;
 exports.deleteBanner = deleteBanner;
-exports.getFacebookSettings = getFacebookSettings;
-exports.updateFacebookSettings = updateFacebookSettings;
-exports.getGoogleSettings = getGoogleSettings;
-exports.updateGoogleSettings = updateGoogleSettings;
-exports.getWhatsAppSettings = getWhatsAppSettings;
-exports.updateWhatsAppSettings = updateWhatsAppSettings;
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../../lib/prisma"));
-const JWT_SECRET = process.env.JWT_SECRET;
-function requireAdminOrManager(req, res) {
-    try {
-        const token = req.cookies.token;
-        if (!token) {
-            res.status(401).json({ message: "Unauthorized" });
-            return false;
-        }
-        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-        if (decoded.role !== "admin" && decoded.role !== "manager") {
-            res.status(403).json({ message: "Access required" });
-            return false;
-        }
-        return true;
-    }
-    catch (_a) {
-        res.status(401).json({ message: "Token expired" });
-        return false;
-    }
-}
-function requireAdmin(req, res) {
-    try {
-        const token = req.cookies.token;
-        if (!token) {
-            res.status(401).json({ message: "Unauthorized" });
-            return false;
-        }
-        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-        if (decoded.role !== "admin") {
-            res.status(403).json({ message: "Admin only" });
-            return false;
-        }
-        return true;
-    }
-    catch (_a) {
-        res.status(401).json({ message: "Token expired" });
-        return false;
-    }
-}
 function getOrCreateSettings() {
     return __awaiter(this, void 0, void 0, function* () {
         let s = yield prisma_1.default.generalSettings.findFirst({ include: { banners: { orderBy: { order: "asc" } } } });
@@ -94,11 +37,10 @@ function getSettings(_req, res) {
 }
 function updateSettings(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (!requireAdminOrManager(req, res))
-            return;
         try {
             const s = yield getOrCreateSettings();
-            const _a = req.body, { banners: _ } = _a, data = __rest(_a, ["banners"]); // banners managed separately
+            const b = req.body;
+            const data = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (b.siteTitle !== undefined && { siteTitle: b.siteTitle })), (b.siteDescription !== undefined && { siteDescription: b.siteDescription })), (b.logo !== undefined && { logo: b.logo })), (b.favicon !== undefined && { favicon: b.favicon })), (b.email !== undefined && { email: b.email })), (b.phone !== undefined && { phone: b.phone })), (b.address !== undefined && { address: b.address })), (b.supportEmail !== undefined && { supportEmail: b.supportEmail })), (b.facebook !== undefined && { facebook: b.facebook })), (b.instagram !== undefined && { instagram: b.instagram })), (b.twitter !== undefined && { twitter: b.twitter })), (b.linkedin !== undefined && { linkedin: b.linkedin })), (b.youtube !== undefined && { youtube: b.youtube })), (b.tiktok !== undefined && { tiktok: b.tiktok })), (b.whatsapp !== undefined && { whatsapp: b.whatsapp })), (b.telegram !== undefined && { telegram: b.telegram })), (b.metaTitle !== undefined && { metaTitle: b.metaTitle })), (b.metaDescription !== undefined && { metaDescription: b.metaDescription })), (b.metaKeywords !== undefined && { metaKeywords: b.metaKeywords })), (b.metaImage !== undefined && { metaImage: b.metaImage })), (b.footerText !== undefined && { footerText: b.footerText })), (b.deliveryFree !== undefined && { deliveryFree: b.deliveryFree })), (b.deliveryInsideDhaka !== undefined && { deliveryInsideDhaka: b.deliveryInsideDhaka })), (b.deliveryOutsideDhaka !== undefined && { deliveryOutsideDhaka: b.deliveryOutsideDhaka })), (b.fbPixelId !== undefined && { fbPixelId: b.fbPixelId || null })), (b.fbAccessToken !== undefined && { fbAccessToken: b.fbAccessToken || null })), (b.fbPixelEnabled !== undefined && { fbPixelEnabled: b.fbPixelEnabled })), (b.googlePixelId !== undefined && { googlePixelId: b.googlePixelId || null })), (b.googlePixelEnabled !== undefined && { googlePixelEnabled: b.googlePixelEnabled })), (b.whatsappApiUrl !== undefined && { whatsappApiUrl: b.whatsappApiUrl || null })), (b.whatsappApiToken !== undefined && { whatsappApiToken: b.whatsappApiToken || null })), (b.whatsappEnabled !== undefined && { whatsappEnabled: b.whatsappEnabled }));
             const updated = yield prisma_1.default.generalSettings.update({
                 where: { id: s.id }, data,
                 include: { banners: { orderBy: { order: "asc" } } },
@@ -112,8 +54,6 @@ function updateSettings(req, res) {
 }
 function addBanner(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (!requireAdmin(req, res))
-            return;
         try {
             const s = yield getOrCreateSettings();
             const { desktopImage, mobileImage, link } = req.body;
@@ -130,131 +70,9 @@ function addBanner(req, res) {
 }
 function deleteBanner(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (!requireAdmin(req, res))
-            return;
         try {
             yield prisma_1.default.banner.delete({ where: { id: parseInt(req.params.id) } });
             return res.json({ message: "Deleted" });
-        }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
-        }
-    });
-}
-function getFacebookSettings(_req, res) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const s = yield getOrCreateSettings();
-            return res.json({
-                pixelId: s.fbPixelId || "",
-                accessToken: s.fbAccessToken || "",
-                enabled: s.fbPixelEnabled || false,
-            });
-        }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
-        }
-    });
-}
-function updateFacebookSettings(req, res) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (!requireAdmin(req, res))
-            return;
-        try {
-            const s = yield getOrCreateSettings();
-            const { pixelId, accessToken, enabled } = req.body;
-            const updated = yield prisma_1.default.generalSettings.update({
-                where: { id: s.id },
-                data: {
-                    fbPixelId: pixelId || null,
-                    fbAccessToken: accessToken || null,
-                    fbPixelEnabled: enabled || false,
-                },
-            });
-            return res.json({ message: "Facebook settings updated", settings: {
-                    pixelId: updated.fbPixelId || "",
-                    accessToken: updated.fbAccessToken || "",
-                    enabled: updated.fbPixelEnabled || false,
-                } });
-        }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
-        }
-    });
-}
-function getGoogleSettings(_req, res) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const s = yield getOrCreateSettings();
-            return res.json({
-                pixelId: s.googlePixelId || "",
-                enabled: s.googlePixelEnabled || false,
-            });
-        }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
-        }
-    });
-}
-function updateGoogleSettings(req, res) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (!requireAdmin(req, res))
-            return;
-        try {
-            const s = yield getOrCreateSettings();
-            const { pixelId, enabled } = req.body;
-            const updated = yield prisma_1.default.generalSettings.update({
-                where: { id: s.id },
-                data: {
-                    googlePixelId: pixelId || null,
-                    googlePixelEnabled: enabled || false,
-                },
-            });
-            return res.json({ message: "Google settings updated", settings: {
-                    pixelId: updated.googlePixelId || "",
-                    enabled: updated.googlePixelEnabled || false,
-                } });
-        }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
-        }
-    });
-}
-function getWhatsAppSettings(_req, res) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const s = yield getOrCreateSettings();
-            return res.json({
-                apiUrl: s.whatsappApiUrl || "",
-                apiToken: s.whatsappApiToken || "",
-                enabled: s.whatsappEnabled || false,
-            });
-        }
-        catch (error) {
-            return res.status(500).json({ message: "Server error", error });
-        }
-    });
-}
-function updateWhatsAppSettings(req, res) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (!requireAdmin(req, res))
-            return;
-        try {
-            const s = yield getOrCreateSettings();
-            const { apiUrl, apiToken, enabled } = req.body;
-            const updated = yield prisma_1.default.generalSettings.update({
-                where: { id: s.id },
-                data: {
-                    whatsappApiUrl: apiUrl || null,
-                    whatsappApiToken: apiToken || null,
-                    whatsappEnabled: enabled || false,
-                },
-            });
-            return res.json({ message: "WhatsApp settings updated", settings: {
-                    apiUrl: updated.whatsappApiUrl || "",
-                    apiToken: updated.whatsappApiToken || "",
-                    enabled: updated.whatsappEnabled || false,
-                } });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });

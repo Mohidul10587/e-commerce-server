@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.designerSubmitDesign = exports.getOrderForDesigner = exports.bulkAssignDesigner = exports.assignDesigner = exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
+exports.designerSubmitDesign = exports.getOrderForDesigner = exports.getDesignerDashboardOrders = exports.bulkAssignDesigner = exports.assignDesigner = exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
 const steadfast_service_1 = require("../courier/steadfast.service");
@@ -914,6 +914,28 @@ const bulkAssignDesigner = (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.bulkAssignDesigner = bulkAssignDesigner;
+// Designer page: fetch all orders assigned to the requesting designer (WaitForDesign, Revision, UrgentDesign, DesignSubmitted)
+const getDesignerDashboardOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        // @ts-ignore
+        const requesterId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const orders = yield prisma_1.prisma.order.findMany({
+            where: {
+                isTrashed: false,
+                status: { in: ["WaitForDesign", "Revision", "UrgentDesign", "DesignSubmitted"] },
+                assignedDesignerId: requesterId,
+            },
+            include: { items: true },
+            orderBy: { createdAt: "asc" },
+        });
+        return res.json({ orders });
+    }
+    catch (_b) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.getDesignerDashboardOrders = getDesignerDashboardOrders;
 // Designer-only: get order details without sensitive info (no price, no customer info)
 const getOrderForDesigner = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;

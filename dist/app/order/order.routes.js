@@ -20,6 +20,7 @@ exports.orderRoutes.patch("/items/:itemId/quantity", auth_1.verifyAdminManagerOr
 exports.orderRoutes.patch("/items/:itemId/variant", auth_1.verifyAdminManagerOrSupport, order_controller_1.updateOrderItemVariant);
 exports.orderRoutes.delete("/items/:itemId", auth_1.verifyAdminManagerOrSupport, order_controller_1.removeOrderItem);
 exports.orderRoutes.get("/counts", order_controller_1.getOrderStatusCounts);
+exports.orderRoutes.get("/designer/dashboard", auth_1.verifyUser, order_controller_1.getDesignerDashboardOrders);
 exports.orderRoutes.get("/", order_controller_1.getOrders);
 exports.orderRoutes.get("/:id/designer-view", auth_1.verifyUser, order_controller_1.getOrderForDesigner);
 exports.orderRoutes.patch("/:id/designer-submit", auth_1.verifyUser, order_controller_1.designerSubmitDesign);
