@@ -26,6 +26,7 @@ exports.createProductSchema = zod_1.z.object({
     type: zod_1.z.enum(["seal", "ink"]),
     lowStockThreshold: zod_1.z.number().int().min(0).optional(),
     isFreeGift: zod_1.z.boolean().optional(),
+    showOnLanding: zod_1.z.boolean().optional(),
     headingText: zod_1.z.string().optional(),
     youtubeVideoUrl: zod_1.z.string().optional(),
     designSampleImageUrls: zod_1.z.array(zod_1.z.string()).optional(),

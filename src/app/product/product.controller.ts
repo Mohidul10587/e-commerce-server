@@ -27,9 +27,10 @@ const productInclude = {
 
 export async function getProducts(req: Request, res: Response) {
   try {
-    const { type, page = "1", limit = "20", trash, search } = req.query;
+    const { type, page = "1", limit = "20", trash, search, showOnLanding } = req.query;
     const where: any = { isTrashed: trash === "true" };
     if (type) where.type = type;
+    if (showOnLanding === "true") where.showOnLanding = true;
     if (search) {
       const s = search as string;
       where.OR = [
@@ -172,6 +173,7 @@ export async function createProduct(req: Request, res: Response) {
           ...productData,
           keywords: productData.keywords ?? [],
           isFreeGift: productData.isFreeGift ?? false,
+          showOnLanding: productData.showOnLanding ?? false,
           totalStock: 0,
           variants: { create: variants.map(({ id: _id, ...v }) => v) },
         },

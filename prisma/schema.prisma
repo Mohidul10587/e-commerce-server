@@ -111,6 +111,7 @@ model Product {
   lowStockThreshold        Int              @default(0)
   isTrashed                Boolean          @default(false)
   isFreeGift               Boolean          @default(false)
+  showOnLanding            Boolean          @default(false)
   headingText              String?
   youtubeVideoUrl          String?
   designSampleImageUrls    String[]
