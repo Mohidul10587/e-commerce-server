@@ -63,10 +63,12 @@ const productInclude = {
 function getProducts(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { type, page = "1", limit = "20", trash, search } = req.query;
+            const { type, page = "1", limit = "20", trash, search, showOnLanding } = req.query;
             const where = { isTrashed: trash === "true" };
             if (type)
                 where.type = type;
+            if (showOnLanding === "true")
+                where.showOnLanding = true;
             if (search) {
                 const s = search;
                 where.OR = [

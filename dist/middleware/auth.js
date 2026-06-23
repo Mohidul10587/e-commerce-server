@@ -178,7 +178,7 @@ const verifyAdminManagerSupportOrProduction = (req, res, next) => __awaiter(void
     }
 });
 exports.verifyAdminManagerSupportOrProduction = verifyAdminManagerSupportOrProduction;
-/** Admin, Manager, Support, Designer (for assign designer) */
+/** Admin, Manager, Support, Designer (for order editing) */
 const verifyAdminManagerSupportOrDesigner = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const token = req.cookies.token;

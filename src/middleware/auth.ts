@@ -178,7 +178,7 @@ export const verifyAdminManagerSupportOrProduction = async (
   }
 };
 
-/** Admin, Manager, Support, Designer (for assign designer) */
+/** Admin, Manager, Support, Designer (for order editing) */
 export const verifyAdminManagerSupportOrDesigner = async (
   req: Request,
   res: Response,

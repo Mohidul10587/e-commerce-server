@@ -969,6 +969,7 @@ const getOrderForDesigner = (req, res) => __awaiter(void 0, void 0, void 0, func
                         price: true,
                         quantity: true,
                         isFreeItem: true,
+                        variantId: true,
                     },
                 },
             },

@@ -1036,6 +1036,7 @@ export const getOrderForDesigner = async (req: Request, res: Response) => {
             price: true,
             quantity: true,
             isFreeItem: true,
+            variantId: true,
           },
         },
       },
