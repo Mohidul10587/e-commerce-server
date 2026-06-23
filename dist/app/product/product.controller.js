@@ -105,7 +105,7 @@ function getInkProducts(_req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const products = yield prisma_1.default.product.findMany({
-                where: { type: "ink", isTrashed: false },
+                where: { type: "ink", isTrashed: false, isShowAsExtraInkInLandingPage: true },
                 include: productInclude,
                 orderBy: { createdAt: "desc" },
             });
@@ -194,7 +194,7 @@ function createProduct(req, res) {
                     .status(409)
                     .json({ message: `SKU already exists: ${duplicateSku.sku}` });
             const product = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
-                var _a, _b, _c;
+                var _a, _b, _c, _d;
                 // Enforce single free gift product
                 if (productData.isFreeGift) {
                     const existing = yield tx.product.findFirst({
@@ -204,7 +204,7 @@ function createProduct(req, res) {
                         throw Object.assign(new Error(`"${existing.title}" is already marked as the free gift. Remove that tag first.`), { status: 409 });
                 }
                 const created = yield tx.product.create({
-                    data: Object.assign(Object.assign({}, productData), { keywords: (_a = productData.keywords) !== null && _a !== void 0 ? _a : [], isFreeGift: (_b = productData.isFreeGift) !== null && _b !== void 0 ? _b : false, showOnLanding: (_c = productData.showOnLanding) !== null && _c !== void 0 ? _c : false, totalStock: 0, variants: { create: variants.map((_a) => {
+                    data: Object.assign(Object.assign({}, productData), { keywords: (_a = productData.keywords) !== null && _a !== void 0 ? _a : [], isFreeGift: (_b = productData.isFreeGift) !== null && _b !== void 0 ? _b : false, showOnLanding: (_c = productData.showOnLanding) !== null && _c !== void 0 ? _c : false, isShowAsExtraInkInLandingPage: (_d = productData.isShowAsExtraInkInLandingPage) !== null && _d !== void 0 ? _d : false, totalStock: 0, variants: { create: variants.map((_a) => {
                                 var { id: _id } = _a, v = __rest(_a, ["id"]);
                                 return v;
                             }) } }),

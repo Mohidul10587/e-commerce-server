@@ -26,6 +26,7 @@ export const createProductSchema = z.object({
   lowStockThreshold: z.number().int().min(0).optional(),
   isFreeGift: z.boolean().optional(),
   showOnLanding: z.boolean().optional(),
+  isShowAsExtraInkInLandingPage: z.boolean().optional(),
   headingText: z.string().optional(),
   youtubeVideoUrl: z.string().optional(),
   designSampleImageUrls: z.array(z.string()).optional(),

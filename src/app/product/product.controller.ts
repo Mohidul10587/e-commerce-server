@@ -68,7 +68,7 @@ export async function getProducts(req: Request, res: Response) {
 export async function getInkProducts(_req: Request, res: Response) {
   try {
     const products = await prisma.product.findMany({
-      where: { type: "ink", isTrashed: false },
+      where: { type: "ink", isTrashed: false, isShowAsExtraInkInLandingPage: true },
       include: productInclude,
       orderBy: { createdAt: "desc" },
     });
@@ -174,6 +174,7 @@ export async function createProduct(req: Request, res: Response) {
           keywords: productData.keywords ?? [],
           isFreeGift: productData.isFreeGift ?? false,
           showOnLanding: productData.showOnLanding ?? false,
+          isShowAsExtraInkInLandingPage: productData.isShowAsExtraInkInLandingPage ?? false,
           totalStock: 0,
           variants: { create: variants.map(({ id: _id, ...v }) => v) },
         },
