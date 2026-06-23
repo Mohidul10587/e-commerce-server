@@ -8,6 +8,7 @@ import {
   getOrderStatusCounts, getOrderPayments, deleteOrderPayment, updateOrderPaymentTx,
   assignDesigner, bulkAssignDesigner,
   getOrderForDesigner, designerSubmitDesign,
+  getDesignerDashboardOrders,
 } from "./order.controller";
 import { verifyAdminManagerSupportDesignerOrProduction, verifyAdminManagerOrSupport, verifyAdminManagerSupportOrDesigner, verifyAdmin, verifyUser } from "../../middleware/auth";
 
@@ -32,6 +33,7 @@ orderRoutes.patch("/items/:itemId/variant", verifyAdminManagerOrSupport, updateO
 orderRoutes.delete("/items/:itemId", verifyAdminManagerOrSupport, removeOrderItem);
 
 orderRoutes.get("/counts", getOrderStatusCounts);
+orderRoutes.get("/designer/dashboard", verifyUser, getDesignerDashboardOrders);
 orderRoutes.get("/", getOrders);
 orderRoutes.get("/:id/designer-view", verifyUser, getOrderForDesigner);
 orderRoutes.patch("/:id/designer-submit", verifyUser, designerSubmitDesign);

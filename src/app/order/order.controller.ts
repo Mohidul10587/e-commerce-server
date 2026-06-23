@@ -979,6 +979,26 @@ export const bulkAssignDesigner = async (req: Request, res: Response) => {
   }
 };
 
+// Designer page: fetch all orders assigned to the requesting designer (WaitForDesign, Revision, UrgentDesign, DesignSubmitted)
+export const getDesignerDashboardOrders = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    // @ts-ignore
+    const requesterId = req.user?.id;
+    const orders = await prisma.order.findMany({
+      where: {
+        isTrashed: false,
+        status: { in: ["WaitForDesign", "Revision", "UrgentDesign", "DesignSubmitted"] },
+        assignedDesignerId: requesterId,
+      },
+      include: { items: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return res.json({ orders });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 // Designer-only: get order details without sensitive info (no price, no customer info)
 export const getOrderForDesigner = async (req: Request, res: Response) => {
   try {
