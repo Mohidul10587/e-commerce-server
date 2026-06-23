@@ -1,0 +1,2 @@
+ALTER TABLE "GeneralSettings" ADD COLUMN IF NOT EXISTS "googlePixelId" TEXT;
+ALTER TABLE "GeneralSettings" ADD COLUMN IF NOT EXISTS "googlePixelEnabled" BOOLEAN NOT NULL DEFAULT false;

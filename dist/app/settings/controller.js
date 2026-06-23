@@ -29,6 +29,8 @@ exports.addBanner = addBanner;
 exports.deleteBanner = deleteBanner;
 exports.getFacebookSettings = getFacebookSettings;
 exports.updateFacebookSettings = updateFacebookSettings;
+exports.getGoogleSettings = getGoogleSettings;
+exports.updateGoogleSettings = updateGoogleSettings;
 exports.getWhatsAppSettings = getWhatsAppSettings;
 exports.updateWhatsAppSettings = updateWhatsAppSettings;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
@@ -173,6 +175,44 @@ function updateFacebookSettings(req, res) {
                     pixelId: updated.fbPixelId || "",
                     accessToken: updated.fbAccessToken || "",
                     enabled: updated.fbPixelEnabled || false,
+                } });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function getGoogleSettings(_req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const s = yield getOrCreateSettings();
+            return res.json({
+                pixelId: s.googlePixelId || "",
+                enabled: s.googlePixelEnabled || false,
+            });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function updateGoogleSettings(req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!requireAdmin(req, res))
+            return;
+        try {
+            const s = yield getOrCreateSettings();
+            const { pixelId, enabled } = req.body;
+            const updated = yield prisma_1.default.generalSettings.update({
+                where: { id: s.id },
+                data: {
+                    googlePixelId: pixelId || null,
+                    googlePixelEnabled: enabled || false,
+                },
+            });
+            return res.json({ message: "Google settings updated", settings: {
+                    pixelId: updated.googlePixelId || "",
+                    enabled: updated.googlePixelEnabled || false,
                 } });
         }
         catch (error) {

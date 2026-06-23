@@ -14,6 +14,9 @@ router.delete("/banners/:id", auth_1.verifyAdmin, controller_1.deleteBanner);
 // Facebook settings (Admin only)
 router.get("/facebook", controller_1.getFacebookSettings);
 router.post("/facebook", auth_1.verifyAdmin, controller_1.updateFacebookSettings);
+// Google Pixel / GTM settings (Admin only)
+router.get("/google", controller_1.getGoogleSettings);
+router.post("/google", auth_1.verifyAdmin, controller_1.updateGoogleSettings);
 // WhatsApp settings (Admin only)
 router.get("/whatsapp", controller_1.getWhatsAppSettings);
 router.post("/whatsapp", auth_1.verifyAdmin, controller_1.updateWhatsAppSettings);

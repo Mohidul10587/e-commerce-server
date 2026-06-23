@@ -76,6 +76,9 @@ model GeneralSettings {
   fbPixelId       String?
   fbAccessToken   String?
   fbPixelEnabled  Boolean  @default(false)
+  // Google Pixel (GTM) Settings
+  googlePixelId     String?
+  googlePixelEnabled Boolean @default(false)
   // WhatsApp Settings
   whatsappApiUrl    String?
   whatsappApiToken  String?
