@@ -43,8 +43,25 @@ const port = process.env.PORT || 5000;
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, cookie_parser_1.default)());
-app.use((0, cors_1.default)({ origin: allowedOrigins, methods: ["GET", "POST", "PUT", "DELETE", "PATCH"], credentials: true }));
+app.use((0, cors_1.default)({
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    credentials: true,
+}));
 app.get("/", (_req, res) => res.send("Server is running"));
+app.get("/webhooks/whatsapp", (req, res) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+    if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+        return res.status(200).send(challenge);
+    }
+    return res.sendStatus(403);
+});
+app.post("/webhooks/whatsapp", (req, res) => {
+    console.log(JSON.stringify(req.body, null, 2));
+    res.sendStatus(200);
+});
 app.use("/user", routes_1.userRoutes);
 app.use("/settings", routes_2.settingsRoutes);
 app.use("/products", product_routes_1.productRoutes);
