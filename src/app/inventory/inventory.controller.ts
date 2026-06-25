@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../../lib/prisma";
 import { localDayRange } from "../../lib/dateRange";
+import { io } from "../../index";
 
 const LOW_STOCK_THRESHOLD = 5; // fallback only for variants without product threshold
 
@@ -251,6 +252,7 @@ export async function updateVariantInline(req: Request, res: Response) {
       });
     });
 
+    io.emit("inventory:updated", { variantId: id, productId: current.productId });
     return res.json({ message: "Updated" });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
