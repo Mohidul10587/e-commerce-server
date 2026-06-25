@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
 import { io } from "../../index";
 import { createConsignment } from "../courier/steadfast.service";
-import { sendOrderConfirmationWhatsApp } from "../../lib/whatsapp.service";
+import { sendOrderConfirmationWhatsApp, sendOrderStatusWhatsApp, sendPaymentWhatsApp } from "../../lib/whatsapp.service";
 import { adjustStock, syncProductStock } from "../product/product.service";
 
 // Group A: preliminary statuses
@@ -384,6 +384,12 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     }
 
     io.emit("order:updated", order);
+
+    // WhatsApp notifications for key status changes
+    if (status === "OrderConfirmed" || status === "Delivered") {
+      sendOrderStatusWhatsApp(order.customerPhone, order.customerName, id, status as "OrderConfirmed" | "Delivered").catch(() => {});
+    }
+
     return res.json({ order });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -1015,6 +1021,9 @@ export const updateOrderPayment = async (req: Request, res: Response) => {
     });
 
     io.emit("order:updated", order);
+
+    sendPaymentWhatsApp(order.customerPhone, order.customerName, id, Number(amount)).catch(() => {});
+
     return res.json({ order });
   } catch {
     return res.status(500).json({ message: "Internal server error" });

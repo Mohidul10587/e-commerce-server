@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../../lib/prisma";
+import { invalidateWhatsAppCache } from "../../lib/whatsapp.service";
 
 async function getOrCreateSettings() {
   let s = await prisma.generalSettings.findFirst({ include: { banners: { orderBy: { order: "asc" } } } });
@@ -57,6 +58,7 @@ export async function updateSettings(req: Request, res: Response) {
       where: { id: s.id }, data,
       include: { banners: { orderBy: { order: "asc" } } },
     });
+    invalidateWhatsAppCache();
     return res.json({ message: "Settings updated", settings: updated });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });

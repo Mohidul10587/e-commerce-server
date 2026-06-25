@@ -342,6 +342,10 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
             }
         }
         index_1.io.emit("order:updated", order);
+        // WhatsApp notifications for key status changes
+        if (status === "OrderConfirmed" || status === "Delivered") {
+            (0, whatsapp_service_1.sendOrderStatusWhatsApp)(order.customerPhone, order.customerName, id, status).catch(() => { });
+        }
         return res.json({ order });
     }
     catch (_c) {
@@ -940,6 +944,7 @@ const updateOrderPayment = (req, res) => __awaiter(void 0, void 0, void 0, funct
             });
         }));
         index_1.io.emit("order:updated", order);
+        (0, whatsapp_service_1.sendPaymentWhatsApp)(order.customerPhone, order.customerName, id, Number(amount)).catch(() => { });
         return res.json({ order });
     }
     catch (_a) {

@@ -1,27 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -32,88 +9,123 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.invalidateWhatsAppCache = invalidateWhatsAppCache;
 exports.sendOrderConfirmationWhatsApp = sendOrderConfirmationWhatsApp;
-function getWhatsAppConfig() {
+exports.sendOrderStatusWhatsApp = sendOrderStatusWhatsApp;
+exports.sendPaymentWhatsApp = sendPaymentWhatsApp;
+const prisma_1 = require("./prisma");
+let _cache = null;
+const TTL = 5 * 60 * 1000;
+function getConfig() {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b, _c;
+        if (_cache && Date.now() - _cache.cachedAt < TTL)
+            return _cache;
         try {
-            const { prisma } = yield Promise.resolve().then(() => __importStar(require('../lib/prisma')));
-            const settings = yield prisma.generalSettings.findFirst();
-            return {
-                apiUrl: settings === null || settings === void 0 ? void 0 : settings.whatsappApiUrl,
-                apiToken: settings === null || settings === void 0 ? void 0 : settings.whatsappApiToken,
-                enabled: (settings === null || settings === void 0 ? void 0 : settings.whatsappEnabled) || false
+            const s = yield prisma_1.prisma.generalSettings.findFirst();
+            _cache = {
+                apiUrl: (_a = s === null || s === void 0 ? void 0 : s.whatsappApiUrl) !== null && _a !== void 0 ? _a : null,
+                apiToken: (_b = s === null || s === void 0 ? void 0 : s.whatsappApiToken) !== null && _b !== void 0 ? _b : null,
+                enabled: (_c = s === null || s === void 0 ? void 0 : s.whatsappEnabled) !== null && _c !== void 0 ? _c : false,
+                cachedAt: Date.now(),
             };
         }
-        catch (error) {
-            console.error('Failed to load WhatsApp config:', error);
-            return { apiUrl: null, apiToken: null, enabled: false };
+        catch (_d) {
+            _cache = { apiUrl: null, apiToken: null, enabled: false, cachedAt: Date.now() };
         }
+        return _cache;
     });
 }
-function sendOrderConfirmationWhatsApp(orderData) {
+/** Call this after saving settings so the cache refreshes immediately */
+function invalidateWhatsAppCache() {
+    _cache = null;
+}
+// ── Phone normalisation for Bangladesh numbers ────────────────────────────────
+function normalizePhone(raw) {
+    const d = raw.replace(/\D/g, '');
+    if (d.startsWith('880') && d.length === 13)
+        return d;
+    if (d.startsWith('88') && d.length === 12)
+        return d;
+    if (d.startsWith('01') && d.length === 11)
+        return '88' + d;
+    if (d.length === 10)
+        return '8801' + d;
+    return d;
+}
+// ── Core send helper ──────────────────────────────────────────────────────────
+function sendMessage(rawPhone, body) {
     return __awaiter(this, void 0, void 0, function* () {
-        const config = yield getWhatsAppConfig();
-        if (!config.enabled || !config.apiUrl || !config.apiToken) {
-            console.warn('WhatsApp notifications disabled or not configured');
+        const config = yield getConfig();
+        if (!config.enabled || !config.apiUrl || !config.apiToken)
             return false;
-        }
-        // Format phone number (remove +88 if exists, ensure starts with 88)
-        let phone = orderData.customerPhone.replace(/[^\d]/g, '');
-        if (phone.startsWith('88'))
-            phone = phone;
-        else if (phone.startsWith('01'))
-            phone = '88' + phone;
-        else
-            phone = '8801' + phone.slice(-9);
-        // Create message
-        const itemsList = orderData.items
-            .map(item => `• ${item.title} - ${item.quantity}টি - ৳${item.price}`)
-            .join('\n');
-        const message = `🎉 *অর্ডার কনফার্ম!*
-
-প্রিয় ${orderData.customerName},
-আপনার অর্ডার সফলভাবে গৃহীত হয়েছে।
-
-📋 *অর্ডার নম্বর:* ${orderData.orderId}
-
-🛍️ *অর্ডার করা পণ্য:*
-${itemsList}
-
-💰 *মোট:* ৳${orderData.total}
-📍 *ডেলিভারি ঠিকানা:* ${orderData.address}
-
-আমরা শীঘ্রই আপনার সাথে যোগাযোগ করব।
-ধন্যবাদ! 🙏`;
+        const phone = normalizePhone(rawPhone);
         try {
-            // Using WhatsApp Business Cloud API format
-            const response = yield fetch(config.apiUrl, {
+            const res = yield fetch(config.apiUrl, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${config.apiToken}`,
+                    Authorization: `Bearer ${config.apiToken}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     messaging_product: 'whatsapp',
                     to: phone,
                     type: 'text',
-                    text: {
-                        body: message
-                    }
-                })
+                    text: { body },
+                }),
             });
-            if (response.ok) {
-                console.log(`WhatsApp message sent to ${phone} for order ${orderData.orderId}`);
+            if (res.ok) {
+                console.log(`[WhatsApp] ✅ sent to ${phone}`);
                 return true;
             }
-            else {
-                const error = yield response.text();
-                console.error('WhatsApp API error:', error);
-                return false;
-            }
-        }
-        catch (error) {
-            console.error('Failed to send WhatsApp message:', error);
+            console.error('[WhatsApp] API error:', yield res.text());
             return false;
         }
+        catch (err) {
+            console.error('[WhatsApp] send failed:', err);
+            return false;
+        }
+    });
+}
+// ── Public message functions ──────────────────────────────────────────────────
+/** Sent when a new order is placed (public storefront) */
+function sendOrderConfirmationWhatsApp(data) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const itemsList = data.items
+            .map(i => `• ${i.title} — ${i.quantity}টি — ৳${i.price}`)
+            .join('\n');
+        const msg = `🎉 *অর্ডার কনফার্ম!*
+
+প্রিয় ${data.customerName},
+আপনার অর্ডার সফলভাবে গৃহীত হয়েছে।
+
+📋 *অর্ডার নম্বর:* ${data.orderId}
+
+🛍️ *অর্ডার করা পণ্য:*
+${itemsList}
+
+💰 *মোট:* ৳${data.total}
+📍 *ডেলিভারি ঠিকানা:* ${data.address}
+
+আমরা শীঘ্রই আপনার সাথে যোগাযোগ করব।
+ধন্যবাদ! 🙏`;
+        return sendMessage(data.customerPhone, msg);
+    });
+}
+/** Sent when order status changes to OrderConfirmed or Delivered */
+function sendOrderStatusWhatsApp(phone, name, orderId, status) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const messages = {
+            OrderConfirmed: `✅ *অর্ডার কনফার্ম!*\n\nপ্রিয় ${name},\nআপনার অর্ডার #${orderId} কনফার্ম হয়েছে। আমরা শীঘ্রই প্রস্তুত করব।\nধন্যবাদ! 🙏`,
+            Delivered: `🎉 *ডেলিভারি সম্পন্ন!*\n\nপ্রিয় ${name},\nঅর্ডার #${orderId} সফলভাবে পৌঁছে গেছে।\nআমাদের সেবা নিন বারবার। ধন্যবাদ! 🙏`,
+        };
+        return sendMessage(phone, messages[status]);
+    });
+}
+/** Sent when a payment is recorded on an order */
+function sendPaymentWhatsApp(phone, name, orderId, amount) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const msg = `💰 *পেমেন্ট পাওয়া গেছে!*\n\nপ্রিয় ${name},\nআমরা আপনার ৳${amount} পেমেন্ট পেয়েছি।\nঅর্ডার #${orderId}\nধন্যবাদ! 🙏`;
+        return sendMessage(phone, msg);
     });
 }

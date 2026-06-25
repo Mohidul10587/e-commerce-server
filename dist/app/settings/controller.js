@@ -17,6 +17,7 @@ exports.updateSettings = updateSettings;
 exports.addBanner = addBanner;
 exports.deleteBanner = deleteBanner;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
+const whatsapp_service_1 = require("../../lib/whatsapp.service");
 function getOrCreateSettings() {
     return __awaiter(this, void 0, void 0, function* () {
         let s = yield prisma_1.default.generalSettings.findFirst({ include: { banners: { orderBy: { order: "asc" } } } });
@@ -45,6 +46,7 @@ function updateSettings(req, res) {
                 where: { id: s.id }, data,
                 include: { banners: { orderBy: { order: "asc" } } },
             });
+            (0, whatsapp_service_1.invalidateWhatsAppCache)();
             return res.json({ message: "Settings updated", settings: updated });
         }
         catch (error) {
