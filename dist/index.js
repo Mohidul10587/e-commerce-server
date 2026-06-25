@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -23,6 +32,7 @@ const expense_routes_1 = require("./app/expense/expense.routes");
 const payroll_routes_1 = require("./app/payroll/payroll.routes");
 const courier_routes_1 = require("./app/courier/courier.routes");
 const steadfast_webhook_1 = require("./app/courier/steadfast.webhook");
+const prisma_1 = __importDefault(require("./lib/prisma"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
@@ -49,15 +59,18 @@ app.use((0, cors_1.default)({
     credentials: true,
 }));
 app.get("/", (_req, res) => res.send("Server is running"));
-app.get("/webhooks/whatsapp", (req, res) => {
+app.get("/webhooks/whatsapp", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
     const challenge = req.query["hub.challenge"];
-    if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+    const s = yield prisma_1.default.generalSettings.findFirst({
+        include: { banners: { orderBy: { order: "asc" } } },
+    });
+    if (mode === "subscribe" && token === (s === null || s === void 0 ? void 0 : s.whatsappApiToken)) {
         return res.status(200).send(challenge);
     }
     return res.sendStatus(403);
-});
+}));
 app.post("/webhooks/whatsapp", (req, res) => {
     console.log(JSON.stringify(req.body, null, 2));
     res.sendStatus(200);

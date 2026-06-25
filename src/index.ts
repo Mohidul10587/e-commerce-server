@@ -17,6 +17,7 @@ import { expenseRoutes } from "./app/expense/expense.routes";
 import { payrollRoutes } from "./app/payroll/payroll.routes";
 import { courierRoutes } from "./app/courier/courier.routes";
 import { steadfastWebhookRouter } from "./app/courier/steadfast.webhook";
+import prisma from "./lib/prisma";
 
 dotenv.config();
 
@@ -53,12 +54,14 @@ app.use(
 );
 
 app.get("/", (_req: Request, res: Response) => res.send("Server is running"));
-app.get("/webhooks/whatsapp", (req, res) => {
+app.get("/webhooks/whatsapp", async (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-
-  if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+  const s = await prisma.generalSettings.findFirst({
+    include: { banners: { orderBy: { order: "asc" } } },
+  });
+  if (mode === "subscribe" && token === s?.whatsappApiToken) {
     return res.status(200).send(challenge);
   }
 
