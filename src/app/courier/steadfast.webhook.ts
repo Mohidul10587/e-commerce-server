@@ -2,6 +2,12 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
 import { io } from "../../index";
 import dotenv from "dotenv";
+
+const GROUP_A = new Set([
+  "Processing", "WaitForDesign", "DesignSubmitted", "Revision",
+  "CustomerInformed", "NeedToCall", "NoResponse", "UrgentDesign",
+  "Problem", "OnHold", "NotInterested", "InProduction",
+]);
 dotenv.config();
 export const steadfastWebhookRouter = Router();
 
@@ -104,6 +110,13 @@ async function handleDeliveryStatus(payload: {
     await onOrderDelivered(order, payload.cod_amount ?? existing.cod_amount);
   }
 
+  // If order is still in Group A, deduct stock before moving to Group C
+  const from = order.status as string;
+  if (mappedStatus && GROUP_A.has(from) && !order.stockDeducted) {
+    await deductStock(order);
+    orderUpdate.stockDeducted = true;
+  }
+
   const updated = await prisma.order.update({
     where: { id: order.id },
     data: orderUpdate,
@@ -111,6 +124,38 @@ async function handleDeliveryStatus(payload: {
   });
 
   io.emit("order:updated", updated);
+}
+
+// Deduct stock when order leaves Group A via webhook
+async function deductStock(order: any) {
+  const items = await prisma.orderItem.findMany({ where: { orderId: order.id } });
+  for (const item of items) {
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: item.variantId },
+      select: { productId: true },
+    });
+    if (!variant) continue;
+    await prisma.productVariant.update({
+      where: { id: item.variantId },
+      data: { stock: { decrement: item.quantity } },
+    });
+    await prisma.stockHistory.create({
+      data: {
+        variantId: item.variantId,
+        action: "SALE",
+        quantity: item.quantity,
+        note: `Order #${order.id} webhook: left Group A`,
+      },
+    });
+    const agg = await prisma.productVariant.aggregate({
+      where: { productId: variant.productId },
+      _sum: { stock: true },
+    });
+    await prisma.product.update({
+      where: { id: variant.productId },
+      data: { totalStock: agg._sum.stock ?? 0 },
+    });
+  }
 }
 
 // When order is delivered: record COD collection as a payment transaction if balance remains

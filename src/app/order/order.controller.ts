@@ -4,6 +4,7 @@ import { io } from "../../index";
 import { createConsignment } from "../courier/steadfast.service";
 import { sendOrderConfirmationWhatsApp } from "../../lib/whatsapp.service";
 
+// Group A: preliminary statuses
 const GROUP_A = new Set([
   "Processing",
   "WaitForDesign",
@@ -16,15 +17,25 @@ const GROUP_A = new Set([
   "Problem",
   "OnHold",
   "NotInterested",
+  "InProduction",
 ]);
 
-const GROUP_B = new Set([
-  "Cancel",
-  "InProduction",
+// Group B: confirmed
+const GROUP_B = new Set(["OrderConfirmed"]);
+
+// Group C: final/delivery statuses
+const GROUP_C = new Set([
   "InReview",
   "Pending",
   "Delivered",
   "PartlyDelivered",
+  "Cancel",
+  "CourierHold",
+  "DeliveredApprovalPending",
+  "PartialDeliveredApprovalPending",
+  "CancelledApprovalPending",
+  "UnknownApprovalPending",
+  "CourierUnknown",
 ]);
 
 const VALID_STATUSES = [
@@ -46,6 +57,12 @@ const VALID_STATUSES = [
   "Delivered",
   "PartlyDelivered",
   "Cancel",
+  "CourierHold",
+  "DeliveredApprovalPending",
+  "PartialDeliveredApprovalPending",
+  "CancelledApprovalPending",
+  "UnknownApprovalPending",
+  "CourierUnknown",
 ];
 
 export const getOrderStatusCounts = async (_req: Request, res: Response) => {
@@ -275,22 +292,23 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       include: { items: true },
     });
 
-    const from = existing.status;
+    const from = existing.status as string;
 
-    // Block: Group A → Group B directly (must go through OrderConfirmed)
-    if (GROUP_A.has(from) && GROUP_B.has(status)) {
+    // Block: Group A → Group C directly (must go through OrderConfirmed first)
+    if (GROUP_A.has(from) && GROUP_C.has(status)) {
       return res.status(400).json({
-        message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.`,
+        message: `Cannot transition from ${from} directly to ${status}. Must confirm order first (OrderConfirmed).`,
       });
     }
 
     await prisma.$transaction(async (tx) => {
-      // OrderConfirmed → deduct stock (only once)
-      if (status === "OrderConfirmed" && !existing.stockDeducted) {
+      // A → B or A → C (after stockDeducted already set via B): deduct stock once
+      const leavingGroupA = GROUP_A.has(from) && (GROUP_B.has(status) || GROUP_C.has(status));
+      if (leavingGroupA && !existing.stockDeducted) {
         for (const item of existing.items) {
           const variant = await tx.productVariant.findUnique({
             where: { id: item.variantId },
-            select: { productId: true, stock: true },
+            select: { productId: true },
           });
           if (!variant) continue;
           await tx.productVariant.update({
@@ -302,7 +320,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
               variantId: item.variantId,
               action: "SALE",
               quantity: item.quantity,
-              note: `Order #${id} confirmed`,
+              note: `Order #${id} left Group A → ${status}`,
             },
           });
           const agg = await tx.productVariant.aggregate({
@@ -317,8 +335,9 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
         await tx.order.update({ where: { id }, data: { stockDeducted: true } });
       }
 
-      // Post-confirmation → Group A: restore stock if previously deducted
-      if (GROUP_A.has(status) && existing.stockDeducted) {
+      // B/C → A: restore stock
+      const returningToGroupA = GROUP_A.has(status) && (GROUP_B.has(from) || GROUP_C.has(from));
+      if (returningToGroupA && existing.stockDeducted) {
         for (const item of existing.items) {
           const variant = await tx.productVariant.findUnique({
             where: { id: item.variantId },
@@ -334,7 +353,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
               variantId: item.variantId,
               action: "RETURN",
               quantity: item.quantity,
-              note: `Order #${id} returned to ${status}`,
+              note: `Order #${id} returned to Group A → ${status}`,
             },
           });
           const agg = await tx.productVariant.aggregate({
@@ -346,10 +365,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
             data: { totalStock: agg._sum.stock ?? 0 },
           });
         }
-        await tx.order.update({
-          where: { id },
-          data: { stockDeducted: false },
-        });
+        await tx.order.update({ where: { id }, data: { stockDeducted: false } });
       }
 
       const extraData: any = { status };
@@ -746,12 +762,109 @@ export const bulkUpdateOrderStatus = async (req: Request, res: Response) => {
         .status(400)
         .json({ message: "ids array and status are required" });
 
-    await prisma.order.updateMany({
-      where: { id: { in: ids } },
-      data: { status },
-    });
+    if (!VALID_STATUSES.includes(status))
+      return res.status(400).json({ message: "Invalid status" });
+
+    const errors: { id: number; message: string }[] = [];
+
+    for (const rawId of ids) {
+      const id = Number(rawId);
+      try {
+        const existing = await prisma.order.findUnique({
+          where: { id },
+          include: { items: true },
+        });
+        if (!existing) { errors.push({ id, message: "Not found" }); continue; }
+
+        const from = existing.status as string;
+
+        if (GROUP_A.has(from) && GROUP_C.has(status)) {
+          errors.push({ id, message: `Cannot go directly from ${from} to ${status}` });
+          continue;
+        }
+
+        await prisma.$transaction(async (tx) => {
+          const leavingGroupA = GROUP_A.has(from) && (GROUP_B.has(status) || GROUP_C.has(status));
+          if (leavingGroupA && !existing.stockDeducted) {
+            for (const item of existing.items) {
+              const variant = await tx.productVariant.findUnique({
+                where: { id: item.variantId },
+                select: { productId: true },
+              });
+              if (!variant) continue;
+              await tx.productVariant.update({
+                where: { id: item.variantId },
+                data: { stock: { decrement: item.quantity } },
+              });
+              await tx.stockHistory.create({
+                data: {
+                  variantId: item.variantId,
+                  action: "SALE",
+                  quantity: item.quantity,
+                  note: `Order #${id} bulk: left Group A → ${status}`,
+                },
+              });
+              const agg = await tx.productVariant.aggregate({
+                where: { productId: variant.productId },
+                _sum: { stock: true },
+              });
+              await tx.product.update({
+                where: { id: variant.productId },
+                data: { totalStock: agg._sum.stock ?? 0 },
+              });
+            }
+            await tx.order.update({ where: { id }, data: { stockDeducted: true } });
+          }
+
+          const returningToGroupA = GROUP_A.has(status) && (GROUP_B.has(from) || GROUP_C.has(from));
+          if (returningToGroupA && existing.stockDeducted) {
+            for (const item of existing.items) {
+              const variant = await tx.productVariant.findUnique({
+                where: { id: item.variantId },
+                select: { productId: true },
+              });
+              if (!variant) continue;
+              await tx.productVariant.update({
+                where: { id: item.variantId },
+                data: { stock: { increment: item.quantity } },
+              });
+              await tx.stockHistory.create({
+                data: {
+                  variantId: item.variantId,
+                  action: "RETURN",
+                  quantity: item.quantity,
+                  note: `Order #${id} bulk: returned to Group A → ${status}`,
+                },
+              });
+              const agg = await tx.productVariant.aggregate({
+                where: { productId: variant.productId },
+                _sum: { stock: true },
+              });
+              await tx.product.update({
+                where: { id: variant.productId },
+                data: { totalStock: agg._sum.stock ?? 0 },
+              });
+            }
+            await tx.order.update({ where: { id }, data: { stockDeducted: false } });
+          }
+
+          const extraData: any = { status };
+          if (status === "OrderConfirmed" && !existing.confirmedAt) {
+            extraData.confirmedAt = new Date();
+          }
+          await tx.order.update({ where: { id }, data: extraData });
+        });
+      } catch {
+        errors.push({ id, message: "Internal error" });
+      }
+    }
+
     io.emit("order:updated", { ids, status });
-    return res.json({ message: `${ids.length} orders updated to "${status}"` });
+    const successCount = ids.length - errors.length;
+    return res.json({
+      message: `${successCount} orders updated to "${status}"`,
+      ...(errors.length ? { errors } : {}),
+    });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
   }
