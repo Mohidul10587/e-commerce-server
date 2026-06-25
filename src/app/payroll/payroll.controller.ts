@@ -47,6 +47,9 @@ export async function listPayrolls(req: Request, res: Response) {
     else if (year) where.salaryMonth = { startsWith: year };
     else if (month) where.salaryMonth = { endsWith: `-${month.padStart(2, "0")}` };
 
+    // Push role filter to DB via employee relation
+    if (role) where.employee = { role };
+
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
     const tzOffset = parseInt(req.query.tzOffset as string) || 0;
@@ -56,6 +59,9 @@ export async function listPayrolls(req: Request, res: Response) {
     const [payrolls, total] = await Promise.all([
       prisma.payroll.findMany({
         where,
+        include: {
+          employee: { select: { id: true, name: true, role: true } },
+        },
         orderBy: [{ salaryMonth: "desc" }, { createdAt: "desc" }],
         skip: (page - 1) * limit,
         take: limit,
@@ -63,19 +69,9 @@ export async function listPayrolls(req: Request, res: Response) {
       prisma.payroll.count({ where }),
     ]);
 
-    // Attach employee info
-    const employeeIds = [...new Set(payrolls.map((p) => p.employeeId))];
-    const users = await prisma.user.findMany({
-      where: { id: { in: employeeIds } },
-      select: { id: true, name: true, role: true },
-    });
-    const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+    const result = payrolls.map((p) => ({ ...p }));
 
-    // Filter by role if requested
-    let result = payrolls.map((p) => ({ ...p, employee: userMap[p.employeeId] ?? null }));
-    if (role) result = result.filter((p) => p.employee?.role === role);
-
-    return res.json({ payrolls: result, total: role ? result.length : total });
+    return res.json({ payrolls: result, total });
   } catch {
     return res.status(500).json({ message: "Server error" });
   }

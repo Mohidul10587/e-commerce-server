@@ -10,17 +10,23 @@ async function applyStockForPurchase(
   purchaseId: number,
   tx: TxClient
 ) {
+  // Fetch all variants in one query
+  const variantIds = items.map((i) => i.variantId);
+  const variants = await tx.productVariant.findMany({
+    where: { id: { in: variantIds } },
+    select: { id: true, productId: true },
+  });
+  const variantMap = Object.fromEntries(variants.map((v) => [v.id, v]));
   const productIds = new Set<number>();
+
   for (const item of items) {
-    const variant = await tx.productVariant.findUnique({
-      where: { id: item.variantId },
-      select: { productId: true },
-    });
+    const variant = variantMap[item.variantId];
     if (variant) {
       await adjustStock(item.variantId, "ADD", item.quantity, `Purchase #${purchaseId}`, tx as any);
       productIds.add(variant.productId);
     }
   }
+  // Sync each unique product once, outside the per-item loop
   for (const pid of productIds) await syncProductStock(pid, tx as any);
 }
 

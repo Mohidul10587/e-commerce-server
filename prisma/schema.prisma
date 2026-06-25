@@ -44,6 +44,7 @@ model User {
   bonus       Float    @default(0)
   createdAt   DateTime @default(now())
   assignedOrders Order[] @relation("DesignerOrders")
+  payrolls    Payroll[]
 }
 
 model GeneralSettings {
@@ -157,6 +158,8 @@ model StockHistory {
   quantity  Int
   note      String?
   createdAt DateTime    @default(now())
+
+  @@index([variantId, createdAt])
 }
 
 enum OrderStatus {
@@ -219,6 +222,11 @@ model Order {
   transactions        PaymentTransaction[]
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
+
+  @@index([isTrashed, status])
+  @@index([isTrashed, paymentStatus])
+  @@index([assignedDesignerId])
+  @@index([createdAt])
 }
 
 model PaymentTransaction {
@@ -316,6 +324,7 @@ model OfficeExpense {
   createdAt  DateTime              @default(now())
   updatedAt  DateTime              @updatedAt
 
+  @@index([isTrashed, createdAt])
   @@map("office_expenses")
 }
 
@@ -343,6 +352,7 @@ model MarketingExpense {
   createdAt  DateTime                 @default(now())
   updatedAt  DateTime                 @updatedAt
 
+  @@index([isTrashed, createdAt])
   @@map("marketing_expenses")
 }
 
@@ -361,6 +371,7 @@ model FinancialActivityLog {
 model Payroll {
   id             Int      @id @default(autoincrement())
   employeeId     Int
+  employee       User     @relation(fields: [employeeId], references: [id])
   salaryMonth    String   // "YYYY-MM"
   basicSalary    Float
   overtime       Float    @default(0)
@@ -374,5 +385,6 @@ model Payroll {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  @@index([salaryMonth, employeeId])
   @@map("payrolls")
 }

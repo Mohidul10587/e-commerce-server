@@ -68,30 +68,21 @@ const VALID_STATUSES = [
 
 export const getOrderStatusCounts = async (_req: Request, res: Response) => {
   try {
-    const [all, trash, ...rest] = await Promise.all([
+    const [allCount, trashCount, statusGroups, paymentGroups] = await Promise.all([
       prisma.order.count({ where: { isTrashed: false } }),
       prisma.order.count({ where: { isTrashed: true } }),
-      ...VALID_STATUSES.map((s) =>
-        prisma.order.count({ where: { isTrashed: false, status: s as any } })
-      ),
-      prisma.order.count({
-        where: { isTrashed: false, paymentStatus: "unpaid" },
-      }),
-      prisma.order.count({
-        where: { isTrashed: false, paymentStatus: "partial" },
-      }),
-      prisma.order.count({
-        where: { isTrashed: false, paymentStatus: "paid" },
-      }),
+      prisma.order.groupBy({ by: ["status"], where: { isTrashed: false }, _count: { _all: true } }),
+      prisma.order.groupBy({ by: ["paymentStatus"], where: { isTrashed: false }, _count: { _all: true } }),
     ]);
-    const counts: Record<string, number> = { all, trash };
-    VALID_STATUSES.forEach((s, i) => {
-      counts[s] = rest[i];
-    });
-    const offset = VALID_STATUSES.length;
-    counts["unpaid"] = rest[offset];
-    counts["partial"] = rest[offset + 1];
-    counts["paid"] = rest[offset + 2];
+
+    const counts: Record<string, number> = { all: allCount, trash: trashCount };
+    for (const g of statusGroups) counts[g.status] = g._count._all;
+    for (const g of paymentGroups) counts[g.paymentStatus] = g._count._all;
+
+    // Ensure all valid statuses and payment statuses have a 0 default
+    for (const s of VALID_STATUSES) if (!(s in counts)) counts[s] = 0;
+    for (const p of ["unpaid", "partial", "paid"]) if (!(p in counts)) counts[p] = 0;
+
     return res.json(counts);
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -127,12 +118,16 @@ export const createOrder = async (req: Request, res: Response) => {
       isFreeItem: boolean;
     }[] = [];
 
+    const variantIds = items.map((i: any) => Number(i.variantId));
+    const variantsData = await prisma.productVariant.findMany({
+      where: { id: { in: variantIds } },
+      include: { product: true },
+    });
+    const variantMap = Object.fromEntries(variantsData.map((v) => [v.id, v]));
+
     for (const item of items) {
       const isFree = !!item.isFreeItem;
-      const variant = await prisma.productVariant.findUnique({
-        where: { id: Number(item.variantId) },
-        include: { product: true },
-      });
+      const variant = variantMap[Number(item.variantId)];
       if (!variant)
         return res
           .status(400)
@@ -423,7 +418,7 @@ export const updateOrder = async (req: Request, res: Response) => {
 
     // Replace items if provided
     if (Array.isArray(items)) {
-      // Resolve each item's price from DB
+      // Resolve all variants in one query
       let subtotal = 0;
       const resolved: {
         variantId: number;
@@ -433,12 +428,17 @@ export const updateOrder = async (req: Request, res: Response) => {
         sealText: string | null;
         isFreeItem: boolean;
       }[] = [];
+
+      const variantIds = items.map((i: any) => Number(i.variantId));
+      const variantsData = await prisma.productVariant.findMany({
+        where: { id: { in: variantIds } },
+        include: { product: true },
+      });
+      const variantMap = Object.fromEntries(variantsData.map((v) => [v.id, v]));
+
       for (const item of items) {
         const isFree = !!item.isFreeItem;
-        const variant = await prisma.productVariant.findUnique({
-          where: { id: Number(item.variantId) },
-          include: { product: true },
-        });
+        const variant = variantMap[Number(item.variantId)];
         if (!variant)
           return res
             .status(400)
@@ -730,23 +730,71 @@ export const bulkUpdateOrderStatus = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid status" });
 
     const errors: { id: number; message: string }[] = [];
+    const numericIds = ids.map(Number);
 
-    for (const rawId of ids) {
+    // Fetch all orders in one query
+    const allOrders = await prisma.order.findMany({
+      where: { id: { in: numericIds } },
+      include: { items: true },
+    });
+    const orderMap = Object.fromEntries(allOrders.map((o) => [o.id, o]));
+
+    // Separate orders that need stock changes from simple ones
+    const stockOrders: typeof allOrders = [];
+    const simpleOrderIds: number[] = [];
+
+    for (const rawId of numericIds) {
       const id = Number(rawId);
-      try {
-        const existing = await prisma.order.findUnique({
-          where: { id },
-          include: { items: true },
+      const existing = orderMap[id];
+      if (!existing) { errors.push({ id, message: "Not found" }); continue; }
+
+      const from = existing.status as string;
+
+      if (GROUP_A.has(from) && GROUP_C.has(status)) {
+        errors.push({ id, message: `Cannot go directly from ${from} to ${status}` });
+        continue;
+      }
+
+      const leavingGroupA = GROUP_A.has(from) && (GROUP_B.has(status) || GROUP_C.has(status));
+      const returningToGroupA = GROUP_A.has(status) && (GROUP_B.has(from) || GROUP_C.has(from));
+      const needsStockChange = (leavingGroupA && !existing.stockDeducted) || (returningToGroupA && existing.stockDeducted);
+
+      if (needsStockChange) {
+        stockOrders.push(existing);
+      } else {
+        simpleOrderIds.push(id);
+      }
+    }
+
+    // Batch update simple orders (no stock change) with a single updateMany
+    if (simpleOrderIds.length > 0) {
+      const extraData: any = { status };
+      if (status === "OrderConfirmed") {
+        // For simple orders, set confirmedAt only for those that don't have it yet
+        // Use updateMany for those without confirmedAt, and a separate one for those with
+        await Promise.all([
+          prisma.order.updateMany({
+            where: { id: { in: simpleOrderIds }, confirmedAt: null },
+            data: { status, confirmedAt: new Date() },
+          }),
+          prisma.order.updateMany({
+            where: { id: { in: simpleOrderIds }, NOT: { confirmedAt: null } },
+            data: { status },
+          }),
+        ]);
+      } else {
+        await prisma.order.updateMany({
+          where: { id: { in: simpleOrderIds } },
+          data: extraData,
         });
-        if (!existing) { errors.push({ id, message: "Not found" }); continue; }
+      }
+    }
 
-        const from = existing.status as string;
-
-        if (GROUP_A.has(from) && GROUP_C.has(status)) {
-          errors.push({ id, message: `Cannot go directly from ${from} to ${status}` });
-          continue;
-        }
-
+    // Process stock-related orders individually (they need per-order transactions)
+    for (const existing of stockOrders) {
+      const id = existing.id;
+      const from = existing.status as string;
+      try {
         await prisma.$transaction(async (tx) => {
           const productIds = new Set<number>();
 
@@ -787,7 +835,7 @@ export const bulkUpdateOrderStatus = async (req: Request, res: Response) => {
     }
 
     io.emit("order:updated", { ids, status });
-    const successCount = ids.length - errors.length;
+    const successCount = numericIds.length - errors.length;
     return res.json({
       message: `${successCount} orders updated to "${status}"`,
       ...(errors.length ? { errors } : {}),

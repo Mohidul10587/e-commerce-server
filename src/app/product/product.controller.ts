@@ -92,23 +92,24 @@ export async function getFreeGiftProduct(_req: Request, res: Response) {
 
 export async function getProductBySlug(req: Request, res: Response) {
   try {
-    const product = await prisma.product.findUnique({
-      where: { slug: req.params.slug },
-      include: productInclude,
-    });
+    const [product, freeGiftProduct] = await Promise.all([
+      prisma.product.findUnique({
+        where: { slug: req.params.slug },
+        include: productInclude,
+      }),
+      prisma.product.findFirst({
+        where: { isFreeGift: true, isTrashed: false },
+        include: productInclude,
+      }),
+    ]);
+
     if (!product || product.isTrashed)
       return res.status(404).json({ message: "Product not found" });
 
-    // Include free gift product if this is a seal product
-    let freeGiftProduct = null;
-    if (product.type === "seal") {
-      freeGiftProduct = await prisma.product.findFirst({
-        where: { isFreeGift: true, isTrashed: false },
-        include: productInclude,
-      });
-    }
-
-    return res.json({ product, freeGiftProduct });
+    return res.json({
+      product,
+      freeGiftProduct: product.type === "seal" ? freeGiftProduct : null,
+    });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }
