@@ -24,17 +24,22 @@ const prisma_1 = __importDefault(require("../../lib/prisma"));
 const product_service_1 = require("../product/product.service");
 function applyStockForPurchase(items, purchaseId, tx) {
     return __awaiter(this, void 0, void 0, function* () {
+        // Fetch all variants in one query
+        const variantIds = items.map((i) => i.variantId);
+        const variants = yield tx.productVariant.findMany({
+            where: { id: { in: variantIds } },
+            select: { id: true, productId: true },
+        });
+        const variantMap = Object.fromEntries(variants.map((v) => [v.id, v]));
         const productIds = new Set();
         for (const item of items) {
-            const variant = yield tx.productVariant.findUnique({
-                where: { id: item.variantId },
-                select: { productId: true },
-            });
+            const variant = variantMap[item.variantId];
             if (variant) {
                 yield (0, product_service_1.adjustStock)(item.variantId, "ADD", item.quantity, `Purchase #${purchaseId}`, tx);
                 productIds.add(variant.productId);
             }
         }
+        // Sync each unique product once, outside the per-item loop
         for (const pid of productIds)
             yield (0, product_service_1.syncProductStock)(pid, tx);
     });
@@ -147,11 +152,10 @@ function updatePurchase(req, res) {
                 if (wasReceived && !nowReceived) {
                     // Reverse old stock
                     for (const item of existing.items) {
-                        const variant = yield tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true, stock: true } });
+                        const variant = yield tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
                         if (!variant)
                             continue;
-                        yield tx.productVariant.update({ where: { id: item.variantId }, data: { stock: Math.max(0, variant.stock - item.quantity) } });
-                        yield tx.stockHistory.create({ data: { variantId: item.variantId, action: "REMOVE", quantity: item.quantity, note: `Purchase #${id} edit un-received` } });
+                        yield (0, product_service_1.adjustStock)(item.variantId, "REMOVE", item.quantity, `Purchase #${id} edit un-received`, tx);
                         yield (0, product_service_1.syncProductStock)(variant.productId, tx);
                     }
                 }
@@ -215,20 +219,10 @@ function updatePurchaseStatus(req, res) {
                 // Received → Pending/Ordered: reverse stock
                 if (existing.stockUpdated && targetStatus !== "Received") {
                     for (const item of existing.items) {
-                        const variant = yield tx.productVariant.findUnique({
-                            where: { id: item.variantId },
-                            select: { productId: true, stock: true },
-                        });
+                        const variant = yield tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
                         if (!variant)
                             continue;
-                        const newStock = Math.max(0, variant.stock - item.quantity);
-                        yield tx.productVariant.update({
-                            where: { id: item.variantId },
-                            data: { stock: newStock },
-                        });
-                        yield tx.stockHistory.create({
-                            data: { variantId: item.variantId, action: "REMOVE", quantity: item.quantity, note: `Purchase #${id} un-received` },
-                        });
+                        yield (0, product_service_1.adjustStock)(item.variantId, "REMOVE", item.quantity, `Purchase #${id} un-received`, tx);
                         yield (0, product_service_1.syncProductStock)(variant.productId, tx);
                     }
                     yield tx.purchase.update({ where: { id }, data: { stockUpdated: false, receivedAt: null } });

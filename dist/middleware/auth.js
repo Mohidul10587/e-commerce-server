@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyAdminManagerSupportOrDesigner = exports.verifyAdminManagerSupportOrProduction = exports.verifyAdminManagerSupportDesignerOrProduction = exports.verifyAdminManagerOrSupport = exports.verifyAdminOrManager = exports.verifyAdmin = exports.verifyUserInactive = exports.verifyUser = void 0;
+exports.verifyAdminManagerSupportDesignerOrProduction = exports.verifyAdminManagerSupportOrProduction = exports.verifyAdminManagerSupportOrDesigner = exports.verifyAdminManagerOrSupport = exports.verifyAdminOrManager = exports.verifyAdmin = exports.verifyUserInactive = exports.verifyUser = exports.verifyActiveUser = exports.requireRoles = exports.authenticate = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../lib/prisma"));
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -23,7 +23,6 @@ const COOKIE_OPTIONS = {
     secure: true,
     sameSite: "none",
 };
-/** Clears the token cookie and returns a standardised session-expired response. */
 function sessionExpired(res) {
     res.clearCookie("token", COOKIE_OPTIONS);
     return res.status(401).json({
@@ -32,170 +31,76 @@ function sessionExpired(res) {
         logout: true,
     });
 }
-function getUserFromToken(req) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const token = req.cookies.token;
-        if (!token)
-            return null;
-        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-        return prisma_1.default.user.findUnique({ where: { id: decoded.id } });
-    });
-}
-const verifyUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+/**
+ * Decodes the JWT and attaches { id, phone, role } to req.user.
+ * No DB call. All role-based guards after this are free.
+ */
+const authenticate = (req, res, next) => {
     try {
         const token = req.cookies.token;
-        // Missing or empty token → session expired
         if (!token)
             return sessionExpired(res);
-        const user = yield getUserFromToken(req);
+        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        // @ts-ignore
+        req.user = decoded;
+        next();
+    }
+    catch (_a) {
+        return sessionExpired(res);
+    }
+};
+exports.authenticate = authenticate;
+/**
+ * Returns a middleware that allows only the specified roles.
+ * Must be used after `authenticate`.
+ *
+ * Usage:
+ *   router.get("/", authenticate, requireRoles("admin", "manager"), handler)
+ *   router.use(authenticate);
+ *   router.get("/x", requireRoles("admin"), handler)
+ */
+const requireRoles = (...roles) => (req, res, next) => {
+    var _a;
+    // @ts-ignore
+    const role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
+    if (!roles.includes(role))
+        return res.status(403).json({ message: "Access required" });
+    next();
+};
+exports.requireRoles = requireRoles;
+/**
+ * Hits the DB once to confirm the user still exists and is not trashed.
+ * Use only on routes where a deactivated-account check is truly needed
+ * (e.g. login-like flows, sensitive mutations).
+ * Must be used after `authenticate`.
+ */
+const verifyActiveUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        // @ts-ignore
+        const id = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const user = yield prisma_1.default.user.findUnique({ where: { id } });
         if (!user)
             return sessionExpired(res);
         if (user.isTrashed)
             return res.status(401).json({ message: "Account deactivated" });
         // @ts-ignore
-        req.user = user;
+        req.user = user; // upgrade from JWT payload to full DB record
         next();
     }
-    catch (_a) {
-        // Covers: expired, invalid signature, malformed token
+    catch (_b) {
         return sessionExpired(res);
     }
 });
-exports.verifyUser = verifyUser;
-const verifyUserInactive = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const token = req.cookies.token;
-        if (!token)
-            return sessionExpired(res);
-        const user = yield getUserFromToken(req);
-        if (!user)
-            return sessionExpired(res);
-        // @ts-ignore
-        req.user = user;
-        next();
-    }
-    catch (_a) {
-        return sessionExpired(res);
-    }
-});
-exports.verifyUserInactive = verifyUserInactive;
-const verifyAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const token = req.cookies.token;
-        if (!token)
-            return sessionExpired(res);
-        const user = yield getUserFromToken(req);
-        if (!user)
-            return sessionExpired(res);
-        if (user.role !== "admin")
-            return res.status(403).json({ message: "Admin access required" });
-        // @ts-ignore
-        req.user = user;
-        next();
-    }
-    catch (_a) {
-        return sessionExpired(res);
-    }
-});
-exports.verifyAdmin = verifyAdmin;
-const verifyAdminOrManager = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const token = req.cookies.token;
-        if (!token)
-            return sessionExpired(res);
-        const user = yield getUserFromToken(req);
-        if (!user)
-            return sessionExpired(res);
-        if (user.role !== "admin" && user.role !== "manager")
-            return res.status(403).json({ message: "Access required" });
-        // @ts-ignore
-        req.user = user;
-        next();
-    }
-    catch (_a) {
-        return sessionExpired(res);
-    }
-});
-exports.verifyAdminOrManager = verifyAdminOrManager;
-const verifyAdminManagerOrSupport = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const token = req.cookies.token;
-        if (!token)
-            return sessionExpired(res);
-        const user = yield getUserFromToken(req);
-        if (!user)
-            return sessionExpired(res);
-        if (user.role !== "admin" && user.role !== "manager" && user.role !== "support")
-            return res.status(403).json({ message: "Access required" });
-        // @ts-ignore
-        req.user = user;
-        next();
-    }
-    catch (_a) {
-        return sessionExpired(res);
-    }
-});
-exports.verifyAdminManagerOrSupport = verifyAdminManagerOrSupport;
-/** Admin, Manager, Support, Designer, Production */
-const verifyAdminManagerSupportDesignerOrProduction = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const token = req.cookies.token;
-        if (!token)
-            return sessionExpired(res);
-        const user = yield getUserFromToken(req);
-        if (!user)
-            return sessionExpired(res);
-        const allowed = ["admin", "manager", "support", "designer", "production"];
-        if (!allowed.includes(user.role))
-            return res.status(403).json({ message: "Access required" });
-        // @ts-ignore
-        req.user = user;
-        next();
-    }
-    catch (_a) {
-        return sessionExpired(res);
-    }
-});
-exports.verifyAdminManagerSupportDesignerOrProduction = verifyAdminManagerSupportDesignerOrProduction;
-/** Admin, Manager, Support, Production (for inventory) */
-const verifyAdminManagerSupportOrProduction = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const token = req.cookies.token;
-        if (!token)
-            return sessionExpired(res);
-        const user = yield getUserFromToken(req);
-        if (!user)
-            return sessionExpired(res);
-        const allowed = ["admin", "manager", "support", "production"];
-        if (!allowed.includes(user.role))
-            return res.status(403).json({ message: "Access required" });
-        // @ts-ignore
-        req.user = user;
-        next();
-    }
-    catch (_a) {
-        return sessionExpired(res);
-    }
-});
-exports.verifyAdminManagerSupportOrProduction = verifyAdminManagerSupportOrProduction;
-/** Admin, Manager, Support, Designer (for order editing) */
-const verifyAdminManagerSupportOrDesigner = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const token = req.cookies.token;
-        if (!token)
-            return sessionExpired(res);
-        const user = yield getUserFromToken(req);
-        if (!user)
-            return sessionExpired(res);
-        const allowed = ["admin", "manager", "support", "designer"];
-        if (!allowed.includes(user.role))
-            return res.status(403).json({ message: "Access required" });
-        // @ts-ignore
-        req.user = user;
-        next();
-    }
-    catch (_a) {
-        return sessionExpired(res);
-    }
-});
-exports.verifyAdminManagerSupportOrDesigner = verifyAdminManagerSupportOrDesigner;
+exports.verifyActiveUser = verifyActiveUser;
+// ─── Backwards-compatible named exports ──────────────────────────────────────
+// Each export is: [authenticate, verifyActiveUser (DB, isTrashed check), requireRoles?]
+// Single DB call per request, isTrashed always enforced on protected routes.
+exports.verifyUser = [exports.authenticate, exports.verifyActiveUser];
+exports.verifyUserInactive = [exports.authenticate]; // intentionally skips isTrashed check
+exports.verifyAdmin = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin")];
+exports.verifyAdminOrManager = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager")];
+exports.verifyAdminManagerOrSupport = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager", "support")];
+exports.verifyAdminManagerSupportOrDesigner = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager", "support", "designer")];
+exports.verifyAdminManagerSupportOrProduction = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager", "support", "production")];
+exports.verifyAdminManagerSupportDesignerOrProduction = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager", "support", "designer", "production")];

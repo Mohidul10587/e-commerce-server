@@ -14,6 +14,8 @@ const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
 const steadfast_service_1 = require("../courier/steadfast.service");
 const whatsapp_service_1 = require("../../lib/whatsapp.service");
+const product_service_1 = require("../product/product.service");
+// Group A: preliminary statuses
 const GROUP_A = new Set([
     "Processing",
     "WaitForDesign",
@@ -26,14 +28,23 @@ const GROUP_A = new Set([
     "Problem",
     "OnHold",
     "NotInterested",
-]);
-const GROUP_B = new Set([
-    "Cancel",
     "InProduction",
+]);
+// Group B: confirmed
+const GROUP_B = new Set(["OrderConfirmed"]);
+// Group C: final/delivery statuses
+const GROUP_C = new Set([
     "InReview",
     "Pending",
     "Delivered",
     "PartlyDelivered",
+    "Cancel",
+    "CourierHold",
+    "DeliveredApprovalPending",
+    "PartialDeliveredApprovalPending",
+    "CancelledApprovalPending",
+    "UnknownApprovalPending",
+    "CourierUnknown",
 ]);
 const VALID_STATUSES = [
     "Processing",
@@ -54,31 +65,33 @@ const VALID_STATUSES = [
     "Delivered",
     "PartlyDelivered",
     "Cancel",
+    "CourierHold",
+    "DeliveredApprovalPending",
+    "PartialDeliveredApprovalPending",
+    "CancelledApprovalPending",
+    "UnknownApprovalPending",
+    "CourierUnknown",
 ];
 const getOrderStatusCounts = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const [all, trash, ...rest] = yield Promise.all([
+        const [allCount, trashCount, statusGroups, paymentGroups] = yield Promise.all([
             prisma_1.prisma.order.count({ where: { isTrashed: false } }),
             prisma_1.prisma.order.count({ where: { isTrashed: true } }),
-            ...VALID_STATUSES.map((s) => prisma_1.prisma.order.count({ where: { isTrashed: false, status: s } })),
-            prisma_1.prisma.order.count({
-                where: { isTrashed: false, paymentStatus: "unpaid" },
-            }),
-            prisma_1.prisma.order.count({
-                where: { isTrashed: false, paymentStatus: "partial" },
-            }),
-            prisma_1.prisma.order.count({
-                where: { isTrashed: false, paymentStatus: "paid" },
-            }),
+            prisma_1.prisma.order.groupBy({ by: ["status"], where: { isTrashed: false }, _count: { _all: true } }),
+            prisma_1.prisma.order.groupBy({ by: ["paymentStatus"], where: { isTrashed: false }, _count: { _all: true } }),
         ]);
-        const counts = { all, trash };
-        VALID_STATUSES.forEach((s, i) => {
-            counts[s] = rest[i];
-        });
-        const offset = VALID_STATUSES.length;
-        counts["unpaid"] = rest[offset];
-        counts["partial"] = rest[offset + 1];
-        counts["paid"] = rest[offset + 2];
+        const counts = { all: allCount, trash: trashCount };
+        for (const g of statusGroups)
+            counts[g.status] = g._count._all;
+        for (const g of paymentGroups)
+            counts[g.paymentStatus] = g._count._all;
+        // Ensure all valid statuses and payment statuses have a 0 default
+        for (const s of VALID_STATUSES)
+            if (!(s in counts))
+                counts[s] = 0;
+        for (const p of ["unpaid", "partial", "paid"])
+            if (!(p in counts))
+                counts[p] = 0;
         return res.json(counts);
     }
     catch (_a) {
@@ -93,12 +106,15 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             return res.status(400).json({ message: "Missing required fields" });
         let subtotal = 0;
         const resolvedItems = [];
+        const variantIds = items.map((i) => Number(i.variantId));
+        const variantsData = yield prisma_1.prisma.productVariant.findMany({
+            where: { id: { in: variantIds } },
+            include: { product: true },
+        });
+        const variantMap = Object.fromEntries(variantsData.map((v) => [v.id, v]));
         for (const item of items) {
             const isFree = !!item.isFreeItem;
-            const variant = yield prisma_1.prisma.productVariant.findUnique({
-                where: { id: Number(item.variantId) },
-                include: { product: true },
-            });
+            const variant = variantMap[Number(item.variantId)];
             if (!variant)
                 return res
                     .status(400)
@@ -244,80 +260,42 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
             include: { items: true },
         });
         const from = existing.status;
-        // Block: Group A → Group B directly (must go through OrderConfirmed)
-        if (GROUP_A.has(from) && GROUP_B.has(status)) {
+        // Block: Group A → Group C directly (must go through OrderConfirmed first)
+        if (GROUP_A.has(from) && GROUP_C.has(status)) {
             return res.status(400).json({
-                message: `Cannot transition from ${from} directly to ${status}. Must confirm order first.`,
+                message: `Cannot transition from ${from} directly to ${status}. Must confirm order first (OrderConfirmed).`,
             });
         }
         yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-            var _a, _b;
-            // OrderConfirmed → deduct stock (only once)
-            if (status === "OrderConfirmed" && !existing.stockDeducted) {
+            const productIds = new Set();
+            // A → B or A → C: deduct stock once
+            const leavingGroupA = GROUP_A.has(from) && (GROUP_B.has(status) || GROUP_C.has(status));
+            if (leavingGroupA && !existing.stockDeducted) {
                 for (const item of existing.items) {
-                    const variant = yield tx.productVariant.findUnique({
-                        where: { id: item.variantId },
-                        select: { productId: true, stock: true },
-                    });
+                    const variant = yield tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
                     if (!variant)
                         continue;
-                    yield tx.productVariant.update({
-                        where: { id: item.variantId },
-                        data: { stock: { decrement: item.quantity } },
-                    });
-                    yield tx.stockHistory.create({
-                        data: {
-                            variantId: item.variantId,
-                            action: "SALE",
-                            quantity: item.quantity,
-                            note: `Order #${id} confirmed`,
-                        },
-                    });
-                    const agg = yield tx.productVariant.aggregate({
-                        where: { productId: variant.productId },
-                        _sum: { stock: true },
-                    });
-                    yield tx.product.update({
-                        where: { id: variant.productId },
-                        data: { totalStock: (_a = agg._sum.stock) !== null && _a !== void 0 ? _a : 0 },
-                    });
+                    yield (0, product_service_1.adjustStock)(item.variantId, "SALE", item.quantity, `Order #${id} left Group A → ${status}`, tx);
+                    productIds.add(variant.productId);
                 }
+                for (const pid of productIds)
+                    yield (0, product_service_1.syncProductStock)(pid, tx);
+                productIds.clear();
                 yield tx.order.update({ where: { id }, data: { stockDeducted: true } });
             }
-            // Post-confirmation → Group A: restore stock if previously deducted
-            if (GROUP_A.has(status) && existing.stockDeducted) {
+            // B/C → A: restore stock
+            const returningToGroupA = GROUP_A.has(status) && (GROUP_B.has(from) || GROUP_C.has(from));
+            if (returningToGroupA && existing.stockDeducted) {
                 for (const item of existing.items) {
-                    const variant = yield tx.productVariant.findUnique({
-                        where: { id: item.variantId },
-                        select: { productId: true },
-                    });
+                    const variant = yield tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
                     if (!variant)
                         continue;
-                    yield tx.productVariant.update({
-                        where: { id: item.variantId },
-                        data: { stock: { increment: item.quantity } },
-                    });
-                    yield tx.stockHistory.create({
-                        data: {
-                            variantId: item.variantId,
-                            action: "RETURN",
-                            quantity: item.quantity,
-                            note: `Order #${id} returned to ${status}`,
-                        },
-                    });
-                    const agg = yield tx.productVariant.aggregate({
-                        where: { productId: variant.productId },
-                        _sum: { stock: true },
-                    });
-                    yield tx.product.update({
-                        where: { id: variant.productId },
-                        data: { totalStock: (_b = agg._sum.stock) !== null && _b !== void 0 ? _b : 0 },
-                    });
+                    yield (0, product_service_1.adjustStock)(item.variantId, "RETURN", item.quantity, `Order #${id} returned to Group A → ${status}`, tx);
+                    productIds.add(variant.productId);
                 }
-                yield tx.order.update({
-                    where: { id },
-                    data: { stockDeducted: false },
-                });
+                for (const pid of productIds)
+                    yield (0, product_service_1.syncProductStock)(pid, tx);
+                yield tx.order.update({ where: { id }, data: { stockDeducted: false } });
             }
             const extraData = { status };
             if (status === "OrderConfirmed" && !existing.confirmedAt) {
@@ -393,15 +371,18 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             data.status = status;
         // Replace items if provided
         if (Array.isArray(items)) {
-            // Resolve each item's price from DB
+            // Resolve all variants in one query
             let subtotal = 0;
             const resolved = [];
+            const variantIds = items.map((i) => Number(i.variantId));
+            const variantsData = yield prisma_1.prisma.productVariant.findMany({
+                where: { id: { in: variantIds } },
+                include: { product: true },
+            });
+            const variantMap = Object.fromEntries(variantsData.map((v) => [v.id, v]));
             for (const item of items) {
                 const isFree = !!item.isFreeItem;
-                const variant = yield prisma_1.prisma.productVariant.findUnique({
-                    where: { id: Number(item.variantId) },
-                    include: { product: true },
-                });
+                const variant = variantMap[Number(item.variantId)];
                 if (!variant)
                     return res
                         .status(400)
@@ -685,14 +666,115 @@ const bulkUpdateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, fu
             return res
                 .status(400)
                 .json({ message: "ids array and status are required" });
-        yield prisma_1.prisma.order.updateMany({
-            where: { id: { in: ids } },
-            data: { status },
+        if (!VALID_STATUSES.includes(status))
+            return res.status(400).json({ message: "Invalid status" });
+        const errors = [];
+        const numericIds = ids.map(Number);
+        // Fetch all orders in one query
+        const allOrders = yield prisma_1.prisma.order.findMany({
+            where: { id: { in: numericIds } },
+            include: { items: true },
         });
+        const orderMap = Object.fromEntries(allOrders.map((o) => [o.id, o]));
+        // Separate orders that need stock changes from simple ones
+        const stockOrders = [];
+        const simpleOrderIds = [];
+        for (const rawId of numericIds) {
+            const id = Number(rawId);
+            const existing = orderMap[id];
+            if (!existing) {
+                errors.push({ id, message: "Not found" });
+                continue;
+            }
+            const from = existing.status;
+            if (GROUP_A.has(from) && GROUP_C.has(status)) {
+                errors.push({ id, message: `Cannot go directly from ${from} to ${status}` });
+                continue;
+            }
+            const leavingGroupA = GROUP_A.has(from) && (GROUP_B.has(status) || GROUP_C.has(status));
+            const returningToGroupA = GROUP_A.has(status) && (GROUP_B.has(from) || GROUP_C.has(from));
+            const needsStockChange = (leavingGroupA && !existing.stockDeducted) || (returningToGroupA && existing.stockDeducted);
+            if (needsStockChange) {
+                stockOrders.push(existing);
+            }
+            else {
+                simpleOrderIds.push(id);
+            }
+        }
+        // Batch update simple orders (no stock change) with a single updateMany
+        if (simpleOrderIds.length > 0) {
+            const extraData = { status };
+            if (status === "OrderConfirmed") {
+                // For simple orders, set confirmedAt only for those that don't have it yet
+                // Use updateMany for those without confirmedAt, and a separate one for those with
+                yield Promise.all([
+                    prisma_1.prisma.order.updateMany({
+                        where: { id: { in: simpleOrderIds }, confirmedAt: null },
+                        data: { status, confirmedAt: new Date() },
+                    }),
+                    prisma_1.prisma.order.updateMany({
+                        where: { id: { in: simpleOrderIds }, NOT: { confirmedAt: null } },
+                        data: { status },
+                    }),
+                ]);
+            }
+            else {
+                yield prisma_1.prisma.order.updateMany({
+                    where: { id: { in: simpleOrderIds } },
+                    data: extraData,
+                });
+            }
+        }
+        // Process stock-related orders individually (they need per-order transactions)
+        for (const existing of stockOrders) {
+            const id = existing.id;
+            const from = existing.status;
+            try {
+                yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+                    const productIds = new Set();
+                    const leavingGroupA = GROUP_A.has(from) && (GROUP_B.has(status) || GROUP_C.has(status));
+                    if (leavingGroupA && !existing.stockDeducted) {
+                        for (const item of existing.items) {
+                            const variant = yield tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
+                            if (!variant)
+                                continue;
+                            yield (0, product_service_1.adjustStock)(item.variantId, "SALE", item.quantity, `Order #${id} bulk: left Group A → ${status}`, tx);
+                            productIds.add(variant.productId);
+                        }
+                        for (const pid of productIds)
+                            yield (0, product_service_1.syncProductStock)(pid, tx);
+                        productIds.clear();
+                        yield tx.order.update({ where: { id }, data: { stockDeducted: true } });
+                    }
+                    const returningToGroupA = GROUP_A.has(status) && (GROUP_B.has(from) || GROUP_C.has(from));
+                    if (returningToGroupA && existing.stockDeducted) {
+                        for (const item of existing.items) {
+                            const variant = yield tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
+                            if (!variant)
+                                continue;
+                            yield (0, product_service_1.adjustStock)(item.variantId, "RETURN", item.quantity, `Order #${id} bulk: returned to Group A → ${status}`, tx);
+                            productIds.add(variant.productId);
+                        }
+                        for (const pid of productIds)
+                            yield (0, product_service_1.syncProductStock)(pid, tx);
+                        yield tx.order.update({ where: { id }, data: { stockDeducted: false } });
+                    }
+                    const extraData = { status };
+                    if (status === "OrderConfirmed" && !existing.confirmedAt) {
+                        extraData.confirmedAt = new Date();
+                    }
+                    yield tx.order.update({ where: { id }, data: extraData });
+                }));
+            }
+            catch (_a) {
+                errors.push({ id, message: "Internal error" });
+            }
+        }
         index_1.io.emit("order:updated", { ids, status });
-        return res.json({ message: `${ids.length} orders updated to "${status}"` });
+        const successCount = numericIds.length - errors.length;
+        return res.json(Object.assign({ message: `${successCount} orders updated to "${status}"` }, (errors.length ? { errors } : {})));
     }
-    catch (_a) {
+    catch (_b) {
         return res.status(500).json({ message: "Internal server error" });
     }
 });

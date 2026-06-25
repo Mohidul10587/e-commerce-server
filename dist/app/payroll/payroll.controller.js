@@ -73,6 +73,9 @@ function listPayrolls(req, res) {
                 where.salaryMonth = { startsWith: year };
             else if (month)
                 where.salaryMonth = { endsWith: `-${month.padStart(2, "0")}` };
+            // Push role filter to DB via employee relation
+            if (role)
+                where.employee = { role };
             const startDate = req.query.startDate;
             const endDate = req.query.endDate;
             const tzOffset = parseInt(req.query.tzOffset) || 0;
@@ -82,24 +85,17 @@ function listPayrolls(req, res) {
             const [payrolls, total] = yield Promise.all([
                 prisma_1.default.payroll.findMany({
                     where,
+                    include: {
+                        employee: { select: { id: true, name: true, role: true } },
+                    },
                     orderBy: [{ salaryMonth: "desc" }, { createdAt: "desc" }],
                     skip: (page - 1) * limit,
                     take: limit,
                 }),
                 prisma_1.default.payroll.count({ where }),
             ]);
-            // Attach employee info
-            const employeeIds = [...new Set(payrolls.map((p) => p.employeeId))];
-            const users = yield prisma_1.default.user.findMany({
-                where: { id: { in: employeeIds } },
-                select: { id: true, name: true, role: true },
-            });
-            const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
-            // Filter by role if requested
-            let result = payrolls.map((p) => { var _a; return (Object.assign(Object.assign({}, p), { employee: (_a = userMap[p.employeeId]) !== null && _a !== void 0 ? _a : null })); });
-            if (role)
-                result = result.filter((p) => { var _a; return ((_a = p.employee) === null || _a === void 0 ? void 0 : _a.role) === role; });
-            return res.json({ payrolls: result, total: role ? result.length : total });
+            const result = payrolls.map((p) => (Object.assign({}, p)));
+            return res.json({ payrolls: result, total });
         }
         catch (_a) {
             return res.status(500).json({ message: "Server error" });

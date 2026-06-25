@@ -133,21 +133,22 @@ function getFreeGiftProduct(_req, res) {
 function getProductBySlug(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const product = yield prisma_1.default.product.findUnique({
-                where: { slug: req.params.slug },
-                include: productInclude,
-            });
-            if (!product || product.isTrashed)
-                return res.status(404).json({ message: "Product not found" });
-            // Include free gift product if this is a seal product
-            let freeGiftProduct = null;
-            if (product.type === "seal") {
-                freeGiftProduct = yield prisma_1.default.product.findFirst({
+            const [product, freeGiftProduct] = yield Promise.all([
+                prisma_1.default.product.findUnique({
+                    where: { slug: req.params.slug },
+                    include: productInclude,
+                }),
+                prisma_1.default.product.findFirst({
                     where: { isFreeGift: true, isTrashed: false },
                     include: productInclude,
-                });
-            }
-            return res.json({ product, freeGiftProduct });
+                }),
+            ]);
+            if (!product || product.isTrashed)
+                return res.status(404).json({ message: "Product not found" });
+            return res.json({
+                product,
+                freeGiftProduct: product.type === "seal" ? freeGiftProduct : null,
+            });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });

@@ -19,9 +19,11 @@ exports.getMonthlyChartData = getMonthlyChartData;
 exports.getStockMovementByDateRange = getStockMovementByDateRange;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
 const dateRange_1 = require("../../lib/dateRange");
+const index_1 = require("../../index");
 const LOW_STOCK_THRESHOLD = 5; // fallback only for variants without product threshold
 function getInventoryStats(_req, res) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j;
         try {
             const now = new Date();
             const todayStart = new Date(now);
@@ -31,15 +33,16 @@ function getInventoryStats(_req, res) {
             const monthStart = new Date(now);
             monthStart.setDate(1);
             monthStart.setHours(0, 0, 0, 0);
-            const [variants, totalProducts, stockHistory, purchases, allProductsForLowStock, outOfStockProducts,] = yield Promise.all([
+            const [variants, totalProducts, stockMovement, purchaseStats, allProductsForLowStock, outOfStockProducts,] = yield Promise.all([
                 prisma_1.default.productVariant.findMany({
                     where: { isActive: true },
                     select: { id: true, stock: true, purchasePrice: true, productId: true },
                 }),
                 prisma_1.default.product.count({ where: { isTrashed: false } }),
-                prisma_1.default.stockHistory.findMany({
+                prisma_1.default.stockHistory.groupBy({
+                    by: ["action"],
                     where: { createdAt: { gte: monthStart } },
-                    select: { action: true, quantity: true, createdAt: true },
+                    _sum: { quantity: true },
                 }),
                 prisma_1.default.purchase.findMany({
                     where: { createdAt: { gte: monthStart } },
@@ -79,6 +82,8 @@ function getInventoryStats(_req, res) {
                     take: 10,
                 }),
             ]);
+            // Build a map for quick action → quantity lookup
+            const movementMap = Object.fromEntries(stockMovement.map((g) => { var _a; return [g.action, (_a = g._sum.quantity) !== null && _a !== void 0 ? _a : 0]; }));
             // Stock overview
             const totalStock = variants.reduce((s, v) => s + v.stock, 0);
             const totalStockValue = variants.reduce((s, v) => s + v.stock * v.purchasePrice, 0);
@@ -92,15 +97,28 @@ function getInventoryStats(_req, res) {
                 }) })))
                 .filter((p) => p.variants.length > 0)
                 .slice(0, 10);
-            // Stock movement helpers
-            function movement(action, since) {
-                return stockHistory
-                    .filter((h) => h.action === action && new Date(h.createdAt) >= since)
-                    .reduce((s, h) => s + h.quantity, 0);
-            }
+            // Stock movement helpers — use per-action sums from DB groupBy
+            // For daily/weekly breakdowns we still need the full history within those sub-ranges.
+            // We fetch them lazily only when needed using the already-aggregated map for the monthly total.
+            // For daily/weekly we issue two small targeted queries.
+            const [dailyMovement, weeklyMovement] = yield Promise.all([
+                prisma_1.default.stockHistory.groupBy({
+                    by: ["action"],
+                    where: { createdAt: { gte: todayStart } },
+                    _sum: { quantity: true },
+                }),
+                prisma_1.default.stockHistory.groupBy({
+                    by: ["action"],
+                    where: { createdAt: { gte: weekStart } },
+                    _sum: { quantity: true },
+                }),
+            ]);
+            const dailyMap = Object.fromEntries(dailyMovement.map((g) => { var _a; return [g.action, (_a = g._sum.quantity) !== null && _a !== void 0 ? _a : 0]; }));
+            const weeklyMap = Object.fromEntries(weeklyMovement.map((g) => { var _a; return [g.action, (_a = g._sum.quantity) !== null && _a !== void 0 ? _a : 0]; }));
+            const monthlyMap = movementMap;
             // Purchase summary helpers
             function purchaseSummary(since) {
-                const filtered = purchases.filter((p) => new Date(p.createdAt) >= since);
+                const filtered = purchaseStats.filter((p) => new Date(p.createdAt) >= since);
                 return {
                     amount: filtered.reduce((s, p) => s + p.totalAmount, 0),
                     qty: filtered.reduce((s, p) => s + p.items.reduce((a, i) => a + i.quantity, 0), 0),
@@ -118,16 +136,16 @@ function getInventoryStats(_req, res) {
                 },
                 movement: {
                     daily: {
-                        in: movement("ADD", todayStart),
-                        out: movement("SALE", todayStart) + movement("REMOVE", todayStart),
+                        in: (_a = dailyMap["ADD"]) !== null && _a !== void 0 ? _a : 0,
+                        out: ((_b = dailyMap["SALE"]) !== null && _b !== void 0 ? _b : 0) + ((_c = dailyMap["REMOVE"]) !== null && _c !== void 0 ? _c : 0),
                     },
                     weekly: {
-                        in: movement("ADD", weekStart),
-                        out: movement("SALE", weekStart) + movement("REMOVE", weekStart),
+                        in: (_d = weeklyMap["ADD"]) !== null && _d !== void 0 ? _d : 0,
+                        out: ((_e = weeklyMap["SALE"]) !== null && _e !== void 0 ? _e : 0) + ((_f = weeklyMap["REMOVE"]) !== null && _f !== void 0 ? _f : 0),
                     },
                     monthly: {
-                        in: movement("ADD", monthStart),
-                        out: movement("SALE", monthStart) + movement("REMOVE", monthStart),
+                        in: (_g = monthlyMap["ADD"]) !== null && _g !== void 0 ? _g : 0,
+                        out: ((_h = monthlyMap["SALE"]) !== null && _h !== void 0 ? _h : 0) + ((_j = monthlyMap["REMOVE"]) !== null && _j !== void 0 ? _j : 0),
                     },
                 },
                 purchase: {
@@ -233,6 +251,7 @@ function updateVariantInline(req, res) {
                     data: { totalStock: (_a = agg._sum.stock) !== null && _a !== void 0 ? _a : 0 },
                 });
             }));
+            index_1.io.emit("inventory:updated", { variantId: id, productId: current.productId });
             return res.json({ message: "Updated" });
         }
         catch (error) {
@@ -242,26 +261,35 @@ function updateVariantInline(req, res) {
 }
 function getMonthlyChartData(_req, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a;
         try {
-            const months = [];
             const now = new Date();
-            for (let i = 5; i >= 0; i--) {
+            // Build all date ranges upfront
+            const ranges = Array.from({ length: 6 }, (_, idx) => {
+                const i = 5 - idx;
                 const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
                 const start = new Date(d.getFullYear(), d.getMonth(), 1);
                 const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-                const [history, purchaseAmt] = yield Promise.all([
-                    prisma_1.default.stockHistory.findMany({
-                        where: { createdAt: { gte: start, lt: end } },
-                        select: { action: true, quantity: true },
-                    }),
-                    prisma_1.default.purchase.aggregate({
-                        where: { createdAt: { gte: start, lt: end } },
-                        _sum: { totalAmount: true },
-                    }),
-                ]);
-                months.push({
-                    label: start.toLocaleString("en", { month: "short", year: "2-digit" }),
+                const label = start.toLocaleString("en", { month: "short", year: "2-digit" });
+                return { start, end, label };
+            });
+            // Fire all 12 queries at once
+            const queries = ranges.flatMap(({ start, end }) => [
+                prisma_1.default.stockHistory.findMany({
+                    where: { createdAt: { gte: start, lt: end } },
+                    select: { action: true, quantity: true },
+                }),
+                prisma_1.default.purchase.aggregate({
+                    where: { createdAt: { gte: start, lt: end } },
+                    _sum: { totalAmount: true },
+                }),
+            ]);
+            const results = yield Promise.all(queries);
+            const months = ranges.map(({ label }, idx) => {
+                var _a;
+                const history = results[idx * 2];
+                const purchaseAmt = results[idx * 2 + 1];
+                return {
+                    label,
                     stockIn: history
                         .filter((h) => h.action === "ADD" || h.action === "RETURN")
                         .reduce((s, h) => s + h.quantity, 0),
@@ -269,8 +297,8 @@ function getMonthlyChartData(_req, res) {
                         .filter((h) => h.action === "SALE" || h.action === "REMOVE")
                         .reduce((s, h) => s + h.quantity, 0),
                     purchaseAmount: (_a = purchaseAmt._sum.totalAmount) !== null && _a !== void 0 ? _a : 0,
-                });
-            }
+                };
+            });
             return res.json({ months });
         }
         catch (error) {

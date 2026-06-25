@@ -16,7 +16,13 @@ exports.steadfastWebhookRouter = void 0;
 const express_1 = require("express");
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
+const product_service_1 = require("../product/product.service");
 const dotenv_1 = __importDefault(require("dotenv"));
+const GROUP_A = new Set([
+    "Processing", "WaitForDesign", "DesignSubmitted", "Revision",
+    "CustomerInformed", "NeedToCall", "NoResponse", "UrgentDesign",
+    "Problem", "OnHold", "NotInterested", "InProduction",
+]);
 dotenv_1.default.config();
 exports.steadfastWebhookRouter = (0, express_1.Router)();
 const WEBHOOK_OK = {
@@ -89,6 +95,24 @@ function handleDeliveryStatus(payload) {
         }
         if (payload.status === "delivered") {
             yield onOrderDelivered(order, (_e = payload.cod_amount) !== null && _e !== void 0 ? _e : existing.cod_amount);
+        }
+        // If order is still in Group A, deduct stock before moving to Group C
+        const from = order.status;
+        if (mappedStatus && GROUP_A.has(from) && !order.stockDeducted) {
+            yield prisma_1.prisma.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
+                const items = yield tx.orderItem.findMany({ where: { orderId: order.id } });
+                const productIds = new Set();
+                for (const item of items) {
+                    const variant = yield tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
+                    if (!variant)
+                        continue;
+                    yield (0, product_service_1.adjustStock)(item.variantId, "SALE", item.quantity, `Order #${order.id} webhook: left Group A`, tx);
+                    productIds.add(variant.productId);
+                }
+                for (const pid of productIds)
+                    yield (0, product_service_1.syncProductStock)(pid, tx);
+            }));
+            orderUpdate.stockDeducted = true;
         }
         const updated = yield prisma_1.prisma.order.update({
             where: { id: order.id },

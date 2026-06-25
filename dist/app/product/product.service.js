@@ -55,8 +55,9 @@ function adjustStock(variantId_1, action_1, quantity_1, note_1) {
             : action === "SALE" || action === "REMOVE" ? -quantity
                 : quantity; // ADJUSTMENT: caller passes signed quantity directly
         const newStock = variant.stock + delta;
-        if (newStock < 0)
+        if (newStock < 0 && (action === "ADD" || action === "RETURN" || action === "ADJUSTMENT")) {
             throw new Error(`Insufficient stock for variant ${variantId}`);
+        }
         yield tx.productVariant.update({
             where: { id: variantId },
             data: { stock: newStock },
