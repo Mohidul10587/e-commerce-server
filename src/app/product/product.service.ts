@@ -39,7 +39,9 @@ export async function adjustStock(
     : quantity; // ADJUSTMENT: caller passes signed quantity directly
 
   const newStock = variant.stock + delta;
-  if (newStock < 0) throw new Error(`Insufficient stock for variant ${variantId}`);
+  if (newStock < 0 && (action === "ADD" || action === "RETURN" || action === "ADJUSTMENT")) {
+    throw new Error(`Insufficient stock for variant ${variantId}`);
+  }
 
   await tx.productVariant.update({
     where: { id: variantId },

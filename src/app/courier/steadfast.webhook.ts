@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
 import { io } from "../../index";
+import { adjustStock, syncProductStock } from "../product/product.service";
 import dotenv from "dotenv";
 
 const GROUP_A = new Set([
@@ -113,7 +114,17 @@ async function handleDeliveryStatus(payload: {
   // If order is still in Group A, deduct stock before moving to Group C
   const from = order.status as string;
   if (mappedStatus && GROUP_A.has(from) && !order.stockDeducted) {
-    await deductStock(order);
+    await prisma.$transaction(async (tx) => {
+      const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
+      const productIds = new Set<number>();
+      for (const item of items) {
+        const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
+        if (!variant) continue;
+        await adjustStock(item.variantId, "SALE", item.quantity, `Order #${order.id} webhook: left Group A`, tx as any);
+        productIds.add(variant.productId);
+      }
+      for (const pid of productIds) await syncProductStock(pid, tx as any);
+    });
     orderUpdate.stockDeducted = true;
   }
 
@@ -124,38 +135,6 @@ async function handleDeliveryStatus(payload: {
   });
 
   io.emit("order:updated", updated);
-}
-
-// Deduct stock when order leaves Group A via webhook
-async function deductStock(order: any) {
-  const items = await prisma.orderItem.findMany({ where: { orderId: order.id } });
-  for (const item of items) {
-    const variant = await prisma.productVariant.findUnique({
-      where: { id: item.variantId },
-      select: { productId: true },
-    });
-    if (!variant) continue;
-    await prisma.productVariant.update({
-      where: { id: item.variantId },
-      data: { stock: { decrement: item.quantity } },
-    });
-    await prisma.stockHistory.create({
-      data: {
-        variantId: item.variantId,
-        action: "SALE",
-        quantity: item.quantity,
-        note: `Order #${order.id} webhook: left Group A`,
-      },
-    });
-    const agg = await prisma.productVariant.aggregate({
-      where: { productId: variant.productId },
-      _sum: { stock: true },
-    });
-    await prisma.product.update({
-      where: { id: variant.productId },
-      data: { totalStock: agg._sum.stock ?? 0 },
-    });
-  }
 }
 
 // When order is delivered: record COD collection as a payment transaction if balance remains

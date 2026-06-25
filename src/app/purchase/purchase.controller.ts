@@ -144,10 +144,9 @@ export async function updatePurchase(req: Request, res: Response) {
       if (wasReceived && !nowReceived) {
         // Reverse old stock
         for (const item of existing.items) {
-          const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true, stock: true } });
+          const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
           if (!variant) continue;
-          await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: Math.max(0, variant.stock - item.quantity) } });
-          await tx.stockHistory.create({ data: { variantId: item.variantId, action: "REMOVE", quantity: item.quantity, note: `Purchase #${id} edit un-received` } });
+          await adjustStock(item.variantId, "REMOVE", item.quantity, `Purchase #${id} edit un-received`, tx as any);
           await syncProductStock(variant.productId, tx as any);
         }
       }
@@ -217,19 +216,9 @@ export async function updatePurchaseStatus(req: Request, res: Response) {
       // Received → Pending/Ordered: reverse stock
       if (existing.stockUpdated && targetStatus !== "Received") {
         for (const item of existing.items) {
-          const variant = await tx.productVariant.findUnique({
-            where: { id: item.variantId },
-            select: { productId: true, stock: true },
-          });
+          const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
           if (!variant) continue;
-          const newStock = Math.max(0, variant.stock - item.quantity);
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: newStock },
-          });
-          await tx.stockHistory.create({
-            data: { variantId: item.variantId, action: "REMOVE", quantity: item.quantity, note: `Purchase #${id} un-received` },
-          });
+          await adjustStock(item.variantId, "REMOVE", item.quantity, `Purchase #${id} un-received`, tx as any);
           await syncProductStock(variant.productId, tx as any);
         }
         await tx.purchase.update({ where: { id }, data: { stockUpdated: false, receivedAt: null } });

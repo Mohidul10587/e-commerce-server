@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma";
 import { io } from "../../index";
 import { createConsignment } from "../courier/steadfast.service";
 import { sendOrderConfirmationWhatsApp } from "../../lib/whatsapp.service";
+import { adjustStock, syncProductStock } from "../product/product.service";
 
 // Group A: preliminary statuses
 const GROUP_A = new Set([
@@ -302,36 +303,19 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     }
 
     await prisma.$transaction(async (tx) => {
-      // A → B or A → C (after stockDeducted already set via B): deduct stock once
+      const productIds = new Set<number>();
+
+      // A → B or A → C: deduct stock once
       const leavingGroupA = GROUP_A.has(from) && (GROUP_B.has(status) || GROUP_C.has(status));
       if (leavingGroupA && !existing.stockDeducted) {
         for (const item of existing.items) {
-          const variant = await tx.productVariant.findUnique({
-            where: { id: item.variantId },
-            select: { productId: true },
-          });
+          const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
           if (!variant) continue;
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: { decrement: item.quantity } },
-          });
-          await tx.stockHistory.create({
-            data: {
-              variantId: item.variantId,
-              action: "SALE",
-              quantity: item.quantity,
-              note: `Order #${id} left Group A → ${status}`,
-            },
-          });
-          const agg = await tx.productVariant.aggregate({
-            where: { productId: variant.productId },
-            _sum: { stock: true },
-          });
-          await tx.product.update({
-            where: { id: variant.productId },
-            data: { totalStock: agg._sum.stock ?? 0 },
-          });
+          await adjustStock(item.variantId, "SALE", item.quantity, `Order #${id} left Group A → ${status}`, tx as any);
+          productIds.add(variant.productId);
         }
+        for (const pid of productIds) await syncProductStock(pid, tx as any);
+        productIds.clear();
         await tx.order.update({ where: { id }, data: { stockDeducted: true } });
       }
 
@@ -339,32 +323,12 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       const returningToGroupA = GROUP_A.has(status) && (GROUP_B.has(from) || GROUP_C.has(from));
       if (returningToGroupA && existing.stockDeducted) {
         for (const item of existing.items) {
-          const variant = await tx.productVariant.findUnique({
-            where: { id: item.variantId },
-            select: { productId: true },
-          });
+          const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
           if (!variant) continue;
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: { increment: item.quantity } },
-          });
-          await tx.stockHistory.create({
-            data: {
-              variantId: item.variantId,
-              action: "RETURN",
-              quantity: item.quantity,
-              note: `Order #${id} returned to Group A → ${status}`,
-            },
-          });
-          const agg = await tx.productVariant.aggregate({
-            where: { productId: variant.productId },
-            _sum: { stock: true },
-          });
-          await tx.product.update({
-            where: { id: variant.productId },
-            data: { totalStock: agg._sum.stock ?? 0 },
-          });
+          await adjustStock(item.variantId, "RETURN", item.quantity, `Order #${id} returned to Group A → ${status}`, tx as any);
+          productIds.add(variant.productId);
         }
+        for (const pid of productIds) await syncProductStock(pid, tx as any);
         await tx.order.update({ where: { id }, data: { stockDeducted: false } });
       }
 
@@ -784,67 +748,30 @@ export const bulkUpdateOrderStatus = async (req: Request, res: Response) => {
         }
 
         await prisma.$transaction(async (tx) => {
+          const productIds = new Set<number>();
+
           const leavingGroupA = GROUP_A.has(from) && (GROUP_B.has(status) || GROUP_C.has(status));
           if (leavingGroupA && !existing.stockDeducted) {
             for (const item of existing.items) {
-              const variant = await tx.productVariant.findUnique({
-                where: { id: item.variantId },
-                select: { productId: true },
-              });
+              const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
               if (!variant) continue;
-              await tx.productVariant.update({
-                where: { id: item.variantId },
-                data: { stock: { decrement: item.quantity } },
-              });
-              await tx.stockHistory.create({
-                data: {
-                  variantId: item.variantId,
-                  action: "SALE",
-                  quantity: item.quantity,
-                  note: `Order #${id} bulk: left Group A → ${status}`,
-                },
-              });
-              const agg = await tx.productVariant.aggregate({
-                where: { productId: variant.productId },
-                _sum: { stock: true },
-              });
-              await tx.product.update({
-                where: { id: variant.productId },
-                data: { totalStock: agg._sum.stock ?? 0 },
-              });
+              await adjustStock(item.variantId, "SALE", item.quantity, `Order #${id} bulk: left Group A → ${status}`, tx as any);
+              productIds.add(variant.productId);
             }
+            for (const pid of productIds) await syncProductStock(pid, tx as any);
+            productIds.clear();
             await tx.order.update({ where: { id }, data: { stockDeducted: true } });
           }
 
           const returningToGroupA = GROUP_A.has(status) && (GROUP_B.has(from) || GROUP_C.has(from));
           if (returningToGroupA && existing.stockDeducted) {
             for (const item of existing.items) {
-              const variant = await tx.productVariant.findUnique({
-                where: { id: item.variantId },
-                select: { productId: true },
-              });
+              const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { productId: true } });
               if (!variant) continue;
-              await tx.productVariant.update({
-                where: { id: item.variantId },
-                data: { stock: { increment: item.quantity } },
-              });
-              await tx.stockHistory.create({
-                data: {
-                  variantId: item.variantId,
-                  action: "RETURN",
-                  quantity: item.quantity,
-                  note: `Order #${id} bulk: returned to Group A → ${status}`,
-                },
-              });
-              const agg = await tx.productVariant.aggregate({
-                where: { productId: variant.productId },
-                _sum: { stock: true },
-              });
-              await tx.product.update({
-                where: { id: variant.productId },
-                data: { totalStock: agg._sum.stock ?? 0 },
-              });
+              await adjustStock(item.variantId, "RETURN", item.quantity, `Order #${id} bulk: returned to Group A → ${status}`, tx as any);
+              productIds.add(variant.productId);
             }
+            for (const pid of productIds) await syncProductStock(pid, tx as any);
             await tx.order.update({ where: { id }, data: { stockDeducted: false } });
           }
 
