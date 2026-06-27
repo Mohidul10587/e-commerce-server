@@ -369,7 +369,7 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
             }
         }
         index_1.io.emit("order:updated", order);
-        // WhatsApp notifications for key status changes
+        index_1.io.emit("inventory:updated", {});
         if (status === "OrderConfirmed" || status === "Delivered") {
             (0, whatsapp_service_1.sendOrderStatusWhatsApp)(order.customerPhone, order.customerName, id, status).catch(() => { });
         }
@@ -802,6 +802,7 @@ const bulkUpdateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, fu
             }
         }
         index_1.io.emit("order:updated", { ids, status });
+        index_1.io.emit("inventory:updated", {});
         const successCount = numericIds.length - errors.length;
         return res.json(Object.assign({ message: `${successCount} orders updated to "${status}"` }, (errors.length ? { errors } : {})));
     }

@@ -408,8 +408,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     }
 
     io.emit("order:updated", order);
-
-    // WhatsApp notifications for key status changes
+    io.emit("inventory:updated", {});
     if (status === "OrderConfirmed" || status === "Delivered") {
       sendOrderStatusWhatsApp(order.customerPhone, order.customerName, id, status as "OrderConfirmed" | "Delivered").catch(() => {});
     }
@@ -865,6 +864,7 @@ export const bulkUpdateOrderStatus = async (req: Request, res: Response) => {
     }
 
     io.emit("order:updated", { ids, status });
+    io.emit("inventory:updated", {});
     const successCount = numericIds.length - errors.length;
     return res.json({
       message: `${successCount} orders updated to "${status}"`,
