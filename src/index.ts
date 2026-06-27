@@ -55,20 +55,78 @@ app.use(
 
 app.get("/", (_req: Request, res: Response) => res.send("Server is running"));
 app.get("/webhooks/whatsapp", async (req, res) => {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
-  const s = await prisma.generalSettings.findFirst();
-  if (mode === "subscribe" && token === s?.whatsappApiToken) {
-    return res.status(200).send(challenge);
+  console.log("========== WHATSAPP WEBHOOK VERIFY ==========");
+  console.log("Query:", req.query);
+
+  try {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+
+    const settings = await prisma.generalSettings.findFirst();
+
+    console.log("Mode:", mode);
+    console.log("Received Token:", token);
+    console.log("Expected Token:", settings?.whatsappApiToken);
+    console.log("Challenge:", challenge);
+
+    if (mode === "subscribe" && token === settings?.whatsappApiToken) {
+      console.log("✅ Webhook verification successful");
+      return res.status(200).send(challenge);
+    }
+
+    console.log("❌ Webhook verification failed");
+    return res.sendStatus(403);
+  } catch (err) {
+    console.error("❌ Verification Error:", err);
+    return res.sendStatus(500);
   }
-
-  return res.sendStatus(403);
 });
-app.post("/webhooks/whatsapp", (req, res) => {
-  console.log(JSON.stringify(req.body, null, 2));
 
-  res.sendStatus(200);
+app.post("/webhooks/whatsapp", async (req, res) => {
+  console.log("\n========== NEW WHATSAPP WEBHOOK ==========");
+  console.log("Time:", new Date().toISOString());
+  console.log("Headers:");
+  console.dir(req.headers, { depth: null });
+
+  console.log("\nBody:");
+  console.dir(req.body, { depth: null });
+
+  try {
+    const entry = req.body?.entry?.[0];
+    const change = entry?.changes?.[0];
+    const value = change?.value;
+
+    console.log("\nParsed:");
+
+    if (value?.messages?.length) {
+      const message = value.messages[0];
+
+      console.log("📩 New Message");
+      console.log("From:", message.from);
+      console.log("Message ID:", message.id);
+      console.log("Type:", message.type);
+
+      if (message.text) {
+        console.log("Text:", message.text.body);
+      }
+    }
+
+    if (value?.statuses?.length) {
+      const status = value.statuses[0];
+
+      console.log("📤 Status Update");
+      console.log("Recipient:", status.recipient_id);
+      console.log("Status:", status.status);
+      console.log("Message ID:", status.id);
+      console.log("Timestamp:", status.timestamp);
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("❌ Webhook Processing Error:", err);
+    res.sendStatus(500);
+  }
 });
 app.use("/user", userRoutes);
 app.use("/settings", settingsRoutes);
