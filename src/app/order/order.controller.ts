@@ -66,6 +66,26 @@ const VALID_STATUSES = [
   "CourierUnknown",
 ];
 
+export const getPublicStats = async (_req: Request, res: Response) => {
+  try {
+    const [totalSale, totalCustomers, totalStockOut] = await Promise.all([
+      prisma.order.count({ where: { isTrashed: false } }),
+      prisma.user.count({ where: { role: "customer", isTrashed: false } }),
+      prisma.stockHistory.aggregate({
+        _sum: { quantity: true },
+        where: { action: "REMOVE" },
+      }),
+    ]);
+    return res.json({
+      totalSale,
+      totalCustomers,
+      totalStockOut: totalStockOut._sum.quantity ?? 0,
+    });
+  } catch {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 export const getOrderStatusCounts = async (_req: Request, res: Response) => {
   try {
     const [allCount, trashCount, statusGroups, paymentGroups] = await Promise.all([
@@ -214,10 +234,14 @@ export const getOrders = async (req: Request, res: Response) => {
 
     if (search) {
       const s = search as string;
-      where.OR = [
+      const numericId = parseInt(s);
+      const conditions: any[] = [
         { customerName: { contains: s, mode: "insensitive" } },
         { customerPhone: { contains: s, mode: "insensitive" } },
+        { alternativePhone: { contains: s, mode: "insensitive" } },
       ];
+      if (!isNaN(numericId)) conditions.push({ id: numericId });
+      where.OR = conditions;
     }
 
     // Support comma-separated statuses e.g. "WaitForDesign,Revision,DesignSubmitted"

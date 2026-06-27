@@ -5,7 +5,7 @@ import {
   moveOrderToTrash, restoreOrder, permanentDeleteOrder, emptyOrderTrash,
   updateOrderItemSealText, addOrderItem, removeOrderItem, updateOrderItemQuantity, updateOrderItemVariant,
   bulkTrashOrders, bulkRestoreOrders, bulkUpdateOrderStatus,
-  getOrderStatusCounts, getOrderPayments, deleteOrderPayment, updateOrderPaymentTx,
+  getOrderStatusCounts, getPublicStats, getOrderPayments, deleteOrderPayment, updateOrderPaymentTx,
   assignDesigner, bulkAssignDesigner,
   getOrderForDesigner, designerSubmitDesign,
   getDesignerDashboardOrders,
@@ -14,8 +14,9 @@ import { verifyAdminManagerSupportDesignerOrProduction, verifyAdminManagerOrSupp
 
 export const orderRoutes = Router();
 
-// Public order creation (no auth required for landing/cart/buyNow)
+// Public routes
 orderRoutes.post("/", createOrder);
+orderRoutes.get("/public-stats", getPublicStats);
 
 // All other routes require auth
 orderRoutes.use(verifyAdminManagerSupportDesignerOrProduction);

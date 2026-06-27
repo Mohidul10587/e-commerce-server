@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.designerSubmitDesign = exports.getOrderForDesigner = exports.getDesignerDashboardOrders = exports.bulkAssignDesigner = exports.assignDesigner = exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = void 0;
+exports.designerSubmitDesign = exports.getOrderForDesigner = exports.getDesignerDashboardOrders = exports.bulkAssignDesigner = exports.assignDesigner = exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = exports.getPublicStats = void 0;
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
 const steadfast_service_1 = require("../courier/steadfast.service");
@@ -72,6 +72,28 @@ const VALID_STATUSES = [
     "UnknownApprovalPending",
     "CourierUnknown",
 ];
+const getPublicStats = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const [totalSale, totalCustomers, totalStockOut] = yield Promise.all([
+            prisma_1.prisma.order.count({ where: { isTrashed: false } }),
+            prisma_1.prisma.user.count({ where: { role: "customer", isTrashed: false } }),
+            prisma_1.prisma.stockHistory.aggregate({
+                _sum: { quantity: true },
+                where: { action: "REMOVE" },
+            }),
+        ]);
+        return res.json({
+            totalSale,
+            totalCustomers,
+            totalStockOut: (_a = totalStockOut._sum.quantity) !== null && _a !== void 0 ? _a : 0,
+        });
+    }
+    catch (_b) {
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.getPublicStats = getPublicStats;
 const getOrderStatusCounts = (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const [allCount, trashCount, statusGroups, paymentGroups] = yield Promise.all([
@@ -187,10 +209,15 @@ const getOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const where = { isTrashed: trash === "true" };
         if (search) {
             const s = search;
-            where.OR = [
+            const numericId = parseInt(s);
+            const conditions = [
                 { customerName: { contains: s, mode: "insensitive" } },
                 { customerPhone: { contains: s, mode: "insensitive" } },
+                { alternativePhone: { contains: s, mode: "insensitive" } },
             ];
+            if (!isNaN(numericId))
+                conditions.push({ id: numericId });
+            where.OR = conditions;
         }
         // Support comma-separated statuses e.g. "WaitForDesign,Revision,DesignSubmitted"
         if (status) {

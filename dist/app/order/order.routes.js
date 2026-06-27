@@ -5,8 +5,9 @@ const express_1 = require("express");
 const order_controller_1 = require("./order.controller");
 const auth_1 = require("../../middleware/auth");
 exports.orderRoutes = (0, express_1.Router)();
-// Public order creation (no auth required for landing/cart/buyNow)
+// Public routes
 exports.orderRoutes.post("/", order_controller_1.createOrder);
+exports.orderRoutes.get("/public-stats", order_controller_1.getPublicStats);
 // All other routes require auth
 exports.orderRoutes.use(auth_1.verifyAdminManagerSupportDesignerOrProduction);
 // Bulk routes (must be before /:id)

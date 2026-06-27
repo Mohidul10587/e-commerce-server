@@ -22,6 +22,7 @@ exports.deletePurchase = deletePurchase;
 exports.emptyPurchaseTrash = emptyPurchaseTrash;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
 const product_service_1 = require("../product/product.service");
+const index_1 = require("../../index");
 function applyStockForPurchase(items, purchaseId, tx) {
     return __awaiter(this, void 0, void 0, function* () {
         // Fetch all variants in one query
@@ -126,6 +127,8 @@ function createPurchase(req, res) {
                 }
                 return created;
             }));
+            if (status === "Received")
+                index_1.io.emit("inventory:updated");
             return res.status(201).json({ purchase });
         }
         catch (error) {
@@ -181,6 +184,8 @@ function updatePurchase(req, res) {
                 }
                 return updated;
             }));
+            if (purchase.stockUpdated)
+                index_1.io.emit("inventory:updated");
             return res.json({ purchase });
         }
         catch (error) {

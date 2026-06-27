@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import prisma from "../../lib/prisma";
 import { Prisma } from "@prisma/client";
 import { adjustStock, syncProductStock } from "../product/product.service";
+import { io } from "../../index";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -119,6 +120,7 @@ export async function createPurchase(req: Request, res: Response) {
       return created;
     });
 
+    if (status === "Received") io.emit("inventory:updated");
     return res.status(201).json({ purchase });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
@@ -182,6 +184,7 @@ export async function updatePurchase(req: Request, res: Response) {
       return updated;
     });
 
+    if (purchase.stockUpdated) io.emit("inventory:updated");
     return res.json({ purchase });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
