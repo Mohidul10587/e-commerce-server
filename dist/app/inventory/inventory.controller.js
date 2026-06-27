@@ -23,7 +23,7 @@ const index_1 = require("../../index");
 const LOW_STOCK_THRESHOLD = 5; // fallback only for variants without product threshold
 function getInventoryStats(_req, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
         try {
             const now = new Date();
             const todayStart = new Date(now);
@@ -137,15 +137,15 @@ function getInventoryStats(_req, res) {
                 movement: {
                     daily: {
                         in: (_a = dailyMap["ADD"]) !== null && _a !== void 0 ? _a : 0,
-                        out: ((_b = dailyMap["SALE"]) !== null && _b !== void 0 ? _b : 0) + ((_c = dailyMap["REMOVE"]) !== null && _c !== void 0 ? _c : 0),
+                        out: Math.max(0, ((_b = dailyMap["SALE"]) !== null && _b !== void 0 ? _b : 0) + ((_c = dailyMap["REMOVE"]) !== null && _c !== void 0 ? _c : 0) - ((_d = dailyMap["RETURN"]) !== null && _d !== void 0 ? _d : 0)),
                     },
                     weekly: {
-                        in: (_d = weeklyMap["ADD"]) !== null && _d !== void 0 ? _d : 0,
-                        out: ((_e = weeklyMap["SALE"]) !== null && _e !== void 0 ? _e : 0) + ((_f = weeklyMap["REMOVE"]) !== null && _f !== void 0 ? _f : 0),
+                        in: (_e = weeklyMap["ADD"]) !== null && _e !== void 0 ? _e : 0,
+                        out: Math.max(0, ((_f = weeklyMap["SALE"]) !== null && _f !== void 0 ? _f : 0) + ((_g = weeklyMap["REMOVE"]) !== null && _g !== void 0 ? _g : 0) - ((_h = weeklyMap["RETURN"]) !== null && _h !== void 0 ? _h : 0)),
                     },
                     monthly: {
-                        in: (_g = monthlyMap["ADD"]) !== null && _g !== void 0 ? _g : 0,
-                        out: ((_h = monthlyMap["SALE"]) !== null && _h !== void 0 ? _h : 0) + ((_j = monthlyMap["REMOVE"]) !== null && _j !== void 0 ? _j : 0),
+                        in: (_j = monthlyMap["ADD"]) !== null && _j !== void 0 ? _j : 0,
+                        out: Math.max(0, ((_k = monthlyMap["SALE"]) !== null && _k !== void 0 ? _k : 0) + ((_l = monthlyMap["REMOVE"]) !== null && _l !== void 0 ? _l : 0) - ((_m = monthlyMap["RETURN"]) !== null && _m !== void 0 ? _m : 0)),
                     },
                 },
                 purchase: {
@@ -291,11 +291,13 @@ function getMonthlyChartData(_req, res) {
                 return {
                     label,
                     stockIn: history
-                        .filter((h) => h.action === "ADD" || h.action === "RETURN")
+                        .filter((h) => h.action === "ADD")
                         .reduce((s, h) => s + h.quantity, 0),
-                    stockOut: history
+                    stockOut: Math.max(0, history
                         .filter((h) => h.action === "SALE" || h.action === "REMOVE")
-                        .reduce((s, h) => s + h.quantity, 0),
+                        .reduce((s, h) => s + h.quantity, 0) - history
+                        .filter((h) => h.action === "RETURN")
+                        .reduce((s, h) => s + h.quantity, 0)),
                     purchaseAmount: (_a = purchaseAmt._sum.totalAmount) !== null && _a !== void 0 ? _a : 0,
                 };
             });
@@ -337,9 +339,11 @@ function getStockMovementByDateRange(req, res) {
                     select: { purchaseMoney: true, items: { select: { quantity: true } } },
                 }),
             ]);
-            const stockOut = history
+            const stockOut = Math.max(0, history
                 .filter((h) => h.action === "SALE" || h.action === "REMOVE")
-                .reduce((sum, h) => sum + h.quantity, 0);
+                .reduce((sum, h) => sum + h.quantity, 0) - history
+                .filter((h) => h.action === "RETURN")
+                .reduce((sum, h) => sum + h.quantity, 0));
             const stockIn = receivedPurchases.reduce((sum, p) => sum + p.items.reduce((s, i) => s + i.quantity, 0), 0);
             const purchaseAmount = [...orderedPurchases, ...receivedPurchases].reduce((sum, p) => { var _a; return sum + ((_a = p.purchaseMoney) !== null && _a !== void 0 ? _a : 0); }, 0);
             return res.json({ stockIn, stockOut, purchaseAmount });

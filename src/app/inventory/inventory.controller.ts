@@ -151,15 +151,15 @@ export async function getInventoryStats(_req: Request, res: Response) {
       movement: {
         daily: {
           in: dailyMap["ADD"] ?? 0,
-          out: (dailyMap["SALE"] ?? 0) + (dailyMap["REMOVE"] ?? 0),
+          out: Math.max(0, (dailyMap["SALE"] ?? 0) + (dailyMap["REMOVE"] ?? 0) - (dailyMap["RETURN"] ?? 0)),
         },
         weekly: {
           in: weeklyMap["ADD"] ?? 0,
-          out: (weeklyMap["SALE"] ?? 0) + (weeklyMap["REMOVE"] ?? 0),
+          out: Math.max(0, (weeklyMap["SALE"] ?? 0) + (weeklyMap["REMOVE"] ?? 0) - (weeklyMap["RETURN"] ?? 0)),
         },
         monthly: {
           in: monthlyMap["ADD"] ?? 0,
-          out: (monthlyMap["SALE"] ?? 0) + (monthlyMap["REMOVE"] ?? 0),
+          out: Math.max(0, (monthlyMap["SALE"] ?? 0) + (monthlyMap["REMOVE"] ?? 0) - (monthlyMap["RETURN"] ?? 0)),
         },
       },
       purchase: {
@@ -310,11 +310,13 @@ export async function getMonthlyChartData(_req: Request, res: Response) {
       return {
         label,
         stockIn: history
-          .filter((h) => h.action === "ADD" || h.action === "RETURN")
+          .filter((h) => h.action === "ADD")
           .reduce((s, h) => s + h.quantity, 0),
-        stockOut: history
+        stockOut: Math.max(0, history
           .filter((h) => h.action === "SALE" || h.action === "REMOVE")
-          .reduce((s, h) => s + h.quantity, 0),
+          .reduce((s, h) => s + h.quantity, 0) - history
+          .filter((h) => h.action === "RETURN")
+          .reduce((s, h) => s + h.quantity, 0)),
         purchaseAmount: purchaseAmt._sum.totalAmount ?? 0,
       };
     });
@@ -358,9 +360,11 @@ export async function getStockMovementByDateRange(req: Request, res: Response) {
       }),
     ]);
 
-    const stockOut = history
+    const stockOut = Math.max(0, history
       .filter((h) => h.action === "SALE" || h.action === "REMOVE")
-      .reduce((sum, h) => sum + h.quantity, 0);
+      .reduce((sum, h) => sum + h.quantity, 0) - history
+      .filter((h) => h.action === "RETURN")
+      .reduce((sum, h) => sum + h.quantity, 0));
 
     const stockIn = receivedPurchases.reduce(
       (sum, p) => sum + p.items.reduce((s, i) => s + i.quantity, 0),
