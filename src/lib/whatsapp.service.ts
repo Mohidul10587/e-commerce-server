@@ -44,9 +44,31 @@ function normalizePhone(raw: string): string {
 // ── Core send helper ──────────────────────────────────────────────────────────
 async function sendMessage(rawPhone: string, body: string): Promise<boolean> {
   const config = await getConfig();
-  if (!config.enabled || !config.apiUrl || !config.apiToken) return false;
+
+  // DEBUG: log the full config state so you can see exactly what's loaded
+  console.log('[WhatsApp] DEBUG config:', {
+    enabled: config.enabled,
+    apiUrl: config.apiUrl,
+    hasToken: !!config.apiToken,
+    cachedAt: new Date(config.cachedAt).toISOString(),
+  });
+
+  if (!config.enabled) {
+    console.warn('[WhatsApp] ⚠️ disabled in settings');
+    return false;
+  }
+  if (!config.apiUrl) {
+    console.warn('[WhatsApp] ⚠️ apiUrl is missing in settings');
+    return false;
+  }
+  if (!config.apiToken) {
+    console.warn('[WhatsApp] ⚠️ apiToken is missing in settings');
+    return false;
+  }
 
   const phone = normalizePhone(rawPhone);
+  console.log(`[WhatsApp] sending to ${phone} via ${config.apiUrl}`);
+
   try {
     const res = await fetch(config.apiUrl, {
       method: 'POST',
@@ -61,14 +83,16 @@ async function sendMessage(rawPhone: string, body: string): Promise<boolean> {
         text: { body },
       }),
     });
+
+    const responseText = await res.text();
     if (res.ok) {
-      console.log(`[WhatsApp] ✅ sent to ${phone}`);
+      console.log(`[WhatsApp] ✅ sent to ${phone}`, responseText);
       return true;
     }
-    console.error('[WhatsApp] API error:', await res.text());
+    console.error(`[WhatsApp] ❌ API error ${res.status}:`, responseText);
     return false;
   } catch (err) {
-    console.error('[WhatsApp] send failed:', err);
+    console.error('[WhatsApp] ❌ send failed:', err);
     return false;
   }
 }

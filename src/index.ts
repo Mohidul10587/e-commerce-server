@@ -58,9 +58,7 @@ app.get("/webhooks/whatsapp", async (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-  const s = await prisma.generalSettings.findFirst({
-    include: { banners: { orderBy: { order: "asc" } } },
-  });
+  const s = await prisma.generalSettings.findFirst();
   if (mode === "subscribe" && token === s?.whatsappApiToken) {
     return res.status(200).send(challenge);
   }
