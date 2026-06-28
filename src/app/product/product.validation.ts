@@ -12,6 +12,7 @@ const variantSchema = z.object({
   sku: z.string().min(1),
   images: z.array(z.string()),
   isDefault: z.boolean(),
+  isLandingDefault: z.boolean().optional().default(false),
   isActive: z.boolean().optional(),
 });
 
@@ -27,6 +28,7 @@ export const createProductSchema = z.object({
   isFreeGift: z.boolean().optional(),
   showOnLanding: z.boolean().optional(),
   isShowAsExtraInkInLandingPage: z.boolean().optional(),
+  landingVariantMode: z.enum(["all", "fixed"]).optional().default("all"),
   headingText: z.string().optional(),
   youtubeVideoUrl: z.string().optional(),
   designSampleImageUrls: z.array(z.string()).optional(),
@@ -42,6 +44,9 @@ export const createProductSchema = z.object({
 }).refine(
   (data) => data.variants.filter((v) => v.isDefault).length === 1,
   { message: "Exactly one variant must be marked as default", path: ["variants"] }
+).refine(
+  (data) => data.landingVariantMode !== "fixed" || data.variants.filter((v) => v.isLandingDefault).length === 1,
+  { message: "Fixed mode requires exactly one landing default variant", path: ["variants"] }
 );
 
 export const updateProductSchema = createProductSchema;

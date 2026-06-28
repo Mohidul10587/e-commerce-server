@@ -10,6 +10,7 @@ export interface VariantInput {
   sku: string;
   images: string[];
   isDefault: boolean;
+  isLandingDefault: boolean;
   isActive?: boolean;
 }
 
@@ -22,6 +23,7 @@ export interface CreateProductInput {
   keywords?: string[];
   type: "seal" | "ink";
   isActive?: boolean;
+  landingVariantMode?: "all" | "fixed";
   headingText?: string;
   youtubeVideoUrl?: string;
   designSampleImageUrls?: string[];

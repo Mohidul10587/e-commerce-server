@@ -114,6 +114,7 @@ model Product {
   isFreeGift               Boolean          @default(false)
   showOnLanding            Boolean          @default(false)
   isShowAsExtraInkInLandingPage Boolean     @default(false)
+  landingVariantMode       String           @default("all") // "all" | "fixed"
   headingText              String?
   youtubeVideoUrl          String?
   designSampleImageUrls    String[]
@@ -144,6 +145,7 @@ model ProductVariant {
   sku           String         @unique
   images        String[]
   isDefault     Boolean        @default(false)
+  isLandingDefault Boolean     @default(false)
   isActive      Boolean        @default(true)
   stockHistory  StockHistory[]
   createdAt     DateTime       @default(now())

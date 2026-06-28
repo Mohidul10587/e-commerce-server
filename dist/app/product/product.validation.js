@@ -14,6 +14,7 @@ const variantSchema = zod_1.z.object({
     sku: zod_1.z.string().min(1),
     images: zod_1.z.array(zod_1.z.string()),
     isDefault: zod_1.z.boolean(),
+    isLandingDefault: zod_1.z.boolean().optional().default(false),
     isActive: zod_1.z.boolean().optional(),
 });
 exports.createProductSchema = zod_1.z.object({
@@ -28,6 +29,7 @@ exports.createProductSchema = zod_1.z.object({
     isFreeGift: zod_1.z.boolean().optional(),
     showOnLanding: zod_1.z.boolean().optional(),
     isShowAsExtraInkInLandingPage: zod_1.z.boolean().optional(),
+    landingVariantMode: zod_1.z.enum(["all", "fixed"]).optional().default("all"),
     headingText: zod_1.z.string().optional(),
     youtubeVideoUrl: zod_1.z.string().optional(),
     designSampleImageUrls: zod_1.z.array(zod_1.z.string()).optional(),
@@ -40,5 +42,5 @@ exports.createProductSchema = zod_1.z.object({
     whyNeededDescription: zod_1.z.string().optional(),
     customerReviewImageUrls: zod_1.z.array(zod_1.z.string()).optional(),
     variants: zod_1.z.array(variantSchema).min(1, "At least one variant is required"),
-}).refine((data) => data.variants.filter((v) => v.isDefault).length === 1, { message: "Exactly one variant must be marked as default", path: ["variants"] });
+}).refine((data) => data.variants.filter((v) => v.isDefault).length === 1, { message: "Exactly one variant must be marked as default", path: ["variants"] }).refine((data) => data.landingVariantMode !== "fixed" || data.variants.filter((v) => v.isLandingDefault).length === 1, { message: "Fixed mode requires exactly one landing default variant", path: ["variants"] });
 exports.updateProductSchema = exports.createProductSchema;
