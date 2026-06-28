@@ -20,7 +20,6 @@ const productInclude = {
       sku: true,
       images: true,
       isDefault: true,
-      isLandingDefault: true,
       isActive: true,
     },
   },
@@ -28,10 +27,9 @@ const productInclude = {
 
 export async function getProducts(req: Request, res: Response) {
   try {
-    const { type, page = "1", limit = "20", trash, search, showOnLanding } = req.query;
+    const { type, page = "1", limit = "20", trash, search } = req.query;
     const where: any = { isTrashed: trash === "true" };
     if (type) where.type = type;
-    if (showOnLanding === "true") where.showOnLanding = true;
     if (search) {
       const s = search as string;
       where.OR = [
@@ -69,7 +67,7 @@ export async function getProducts(req: Request, res: Response) {
 export async function getInkProducts(_req: Request, res: Response) {
   try {
     const products = await prisma.product.findMany({
-      where: { type: "ink", isTrashed: false, isShowAsExtraInkInLandingPage: true },
+      where: { type: "ink", isTrashed: false },
       include: productInclude,
       orderBy: { createdAt: "desc" },
     });
@@ -107,10 +105,7 @@ export async function getProductBySlug(req: Request, res: Response) {
     if (!product || product.isTrashed)
       return res.status(404).json({ message: "Product not found" });
 
-    return res.json({
-      product,
-      freeGiftProduct: product.type === "seal" ? freeGiftProduct : null,
-    });
+    return res.json({ product, freeGiftProduct: freeGiftProduct ?? null });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }
@@ -175,9 +170,6 @@ export async function createProduct(req: Request, res: Response) {
           ...productData,
           keywords: productData.keywords ?? [],
           isFreeGift: productData.isFreeGift ?? false,
-          showOnLanding: productData.showOnLanding ?? false,
-          isShowAsExtraInkInLandingPage: productData.isShowAsExtraInkInLandingPage ?? false,
-          landingVariantMode: productData.landingVariantMode ?? "all",
           totalStock: 0,
           variants: { create: variants.map(({ id: _id, ...v }) => v) },
         },

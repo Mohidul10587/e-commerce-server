@@ -15,11 +15,11 @@ import { inventoryRoutes } from "./app/inventory/inventory.routes";
 import { financeRoutes } from "./app/finance/finance.routes";
 import { expenseRoutes } from "./app/expense/expense.routes";
 import { payrollRoutes } from "./app/payroll/payroll.routes";
+import { landingPageRoutes } from "./app/landingPage/landingPage.routes";
 import { courierRoutes } from "./app/courier/courier.routes";
 import { steadfastWebhookRouter } from "./app/courier/steadfast.webhook";
-import prisma from "./lib/prisma";
 
-dotenv.config();
+import prisma from "./lib/prisma";
 
 const app: Express = express();
 const httpServer = createServer(app);
@@ -139,6 +139,7 @@ app.use("/finances", financeRoutes);
 app.use("/expenses", expenseRoutes);
 app.use("/payroll", payrollRoutes);
 app.use("/courier", courierRoutes);
+app.use("/landing-pages", landingPageRoutes);
 app.use("/webhooks", steadfastWebhookRouter);
 
 app.use(errorHandler);

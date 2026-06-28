@@ -99,36 +99,56 @@ model Banner {
   settings     GeneralSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
 }
 
+model LandingPage {
+  id                      Int                  @id @default(autoincrement())
+  slug                    String               @unique
+  title                   String
+  isActive                Boolean              @default(true)
+  headingText             String?
+  youtubeVideoUrl         String?
+  heroDesktopImageUrls    String[]
+  heroMobileImageUrls     String[]
+  designSampleImageUrls   String[]
+  qna                     Json?
+  forWhom                 String[]
+  forWhomHeading          String?
+  forWhomDescription      String?
+  whyNeeded               String[]
+  whyNeededHeading        String?
+  whyNeededDescription    String?
+  customerReviewImageUrls String[]
+  products                LandingPageProduct[]
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+}
+
+model LandingPageProduct {
+  id                 Int         @id @default(autoincrement())
+  landingPageId      Int
+  landingPage        LandingPage @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+  productId          Int
+  product            Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  selectedVariantIds Int[]
+  displayOrder       Int         @default(0)
+}
+
 model Product {
-  id                       Int              @id @default(autoincrement())
-  title                    String
-  slug                     String           @unique
-  description              String?
-  seoTitle                 String?
-  seoDescription           String?
-  keywords                 String[]
-  type                     ProductType
-  totalStock               Int              @default(0)
-  lowStockThreshold        Int              @default(0)
-  isTrashed                Boolean          @default(false)
-  isFreeGift               Boolean          @default(false)
-  showOnLanding            Boolean          @default(false)
-  isShowAsExtraInkInLandingPage Boolean     @default(false)
-  landingVariantMode       String           @default("all") // "all" | "fixed"
-  headingText              String?
-  youtubeVideoUrl          String?
-  designSampleImageUrls    String[]
-  qna                      Json?
-  forWhom                  String[]
-  forWhomHeading           String?
-  forWhomDescription       String?
-  whyNeeded                String[]
-  whyNeededHeading         String?
-  whyNeededDescription     String?
-  customerReviewImageUrls  String[]
-  variants                 ProductVariant[]
-  createdAt                DateTime         @default(now())
-  updatedAt                DateTime         @updatedAt
+  id                Int                  @id @default(autoincrement())
+  title             String
+  slug              String               @unique
+  description       String?
+  seoTitle          String?
+  seoDescription    String?
+  keywords          String[]
+  type              ProductType
+  totalStock        Int                  @default(0)
+  lowStockThreshold Int                  @default(0)
+  isTrashed         Boolean              @default(false)
+  isFreeGift        Boolean              @default(false)
+  variants          ProductVariant[]
+  landingProducts   LandingPageProduct[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 }
 
 model ProductVariant {
@@ -145,7 +165,6 @@ model ProductVariant {
   sku           String         @unique
   images        String[]
   isDefault     Boolean        @default(false)
-  isLandingDefault Boolean     @default(false)
   isActive      Boolean        @default(true)
   stockHistory  StockHistory[]
   createdAt     DateTime       @default(now())
