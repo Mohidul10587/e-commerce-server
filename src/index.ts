@@ -18,6 +18,7 @@ import { payrollRoutes } from "./app/payroll/payroll.routes";
 import { landingPageRoutes } from "./app/landingPage/landingPage.routes";
 import { courierRoutes } from "./app/courier/courier.routes";
 import { steadfastWebhookRouter } from "./app/courier/steadfast.webhook";
+import uploadImageRoutes from "./app/upload-image/routes";
 
 import prisma from "./lib/prisma";
 
@@ -141,7 +142,7 @@ app.use("/payroll", payrollRoutes);
 app.use("/courier", courierRoutes);
 app.use("/landing-pages", landingPageRoutes);
 app.use("/webhooks", steadfastWebhookRouter);
-
+app.use("/upload-image", uploadImageRoutes);
 app.use(errorHandler);
 
 httpServer.listen(port, () => console.log(`Server running on port ${port}`));
