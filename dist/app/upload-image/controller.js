@@ -15,6 +15,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadImage = void 0;
 const cloudinary_1 = require("cloudinary");
 const multer_1 = __importDefault(require("multer"));
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
+/* ---------------- CLOUDINARY CONFIG ---------------- */
+cloudinary_1.v2.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage() });
 exports.uploadImage = [
     upload.single("file"),
