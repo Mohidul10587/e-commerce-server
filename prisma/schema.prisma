@@ -117,6 +117,7 @@ model LandingPage {
   whyNeededHeading        String?
   whyNeededDescription    String?
   customerReviewImageUrls String[]
+  extraInkProductIds      Int[]
   products                LandingPageProduct[]
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt

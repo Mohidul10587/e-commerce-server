@@ -82,12 +82,16 @@ function getLandingPages(_req, res) {
 }
 function getLandingPageBySlug(req, res) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a;
         try {
-            const [page, freeGiftProduct] = yield Promise.all([
-                prisma_1.default.landingPage.findUnique({
-                    where: { slug: req.params.slug },
-                    include: landingPageInclude,
-                }),
+            const page = yield prisma_1.default.landingPage.findUnique({
+                where: { slug: req.params.slug },
+                include: landingPageInclude,
+            });
+            if (!page || !page.isActive)
+                return res.status(404).json({ message: "Landing page not found" });
+            const extraInkIds = (_a = page.extraInkProductIds) !== null && _a !== void 0 ? _a : [];
+            const [freeGiftProduct, extraInkProducts] = yield Promise.all([
                 prisma_1.default.product.findFirst({
                     where: { isFreeGift: true, isTrashed: false },
                     include: {
@@ -98,10 +102,29 @@ function getLandingPageBySlug(req, res) {
                         },
                     },
                 }),
+                extraInkIds.length > 0
+                    ? prisma_1.default.product.findMany({
+                        where: { id: { in: extraInkIds }, isTrashed: false },
+                        include: {
+                            variants: {
+                                where: { isActive: true },
+                                orderBy: { isDefault: "desc" },
+                                select: { id: true, title: true, color: true, size: true, regularPrice: true, salePrice: true, stock: true, images: true, isDefault: true, isActive: true },
+                            },
+                        },
+                    })
+                    : prisma_1.default.product.findMany({
+                        where: { type: "ink", isTrashed: false },
+                        include: {
+                            variants: {
+                                where: { isActive: true },
+                                orderBy: { isDefault: "desc" },
+                                select: { id: true, title: true, color: true, size: true, regularPrice: true, salePrice: true, stock: true, images: true, isDefault: true, isActive: true },
+                            },
+                        },
+                    }),
             ]);
-            if (!page || !page.isActive)
-                return res.status(404).json({ message: "Landing page not found" });
-            return res.json({ page: Object.assign(Object.assign({}, page), { freeGiftProduct: freeGiftProduct !== null && freeGiftProduct !== void 0 ? freeGiftProduct : null }) });
+            return res.json({ page: Object.assign(Object.assign({}, page), { freeGiftProduct: freeGiftProduct !== null && freeGiftProduct !== void 0 ? freeGiftProduct : null, extraInkProducts }) });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });

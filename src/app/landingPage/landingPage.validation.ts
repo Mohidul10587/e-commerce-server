@@ -24,6 +24,7 @@ export const createLandingPageSchema = z.object({
   whyNeededHeading: z.string().optional(),
   whyNeededDescription: z.string().optional(),
   customerReviewImageUrls: z.array(z.string()).optional().default([]),
+  extraInkProductIds: z.array(z.number().int().positive()).optional().default([]),
   products: z.array(landingPageProductSchema).optional().default([]),
 });
 

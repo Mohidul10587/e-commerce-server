@@ -25,6 +25,7 @@ exports.createLandingPageSchema = zod_1.z.object({
     whyNeededHeading: zod_1.z.string().optional(),
     whyNeededDescription: zod_1.z.string().optional(),
     customerReviewImageUrls: zod_1.z.array(zod_1.z.string()).optional().default([]),
+    extraInkProductIds: zod_1.z.array(zod_1.z.number().int().positive()).optional().default([]),
     products: zod_1.z.array(landingPageProductSchema).optional().default([]),
 });
 exports.updateLandingPageSchema = exports.createLandingPageSchema;

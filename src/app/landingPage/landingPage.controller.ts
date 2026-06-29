@@ -55,11 +55,16 @@ export async function getLandingPages(_req: Request, res: Response) {
 
 export async function getLandingPageBySlug(req: Request, res: Response) {
   try {
-    const [page, freeGiftProduct] = await Promise.all([
-      prisma.landingPage.findUnique({
-        where: { slug: req.params.slug },
-        include: landingPageInclude,
-      }),
+    const page = await prisma.landingPage.findUnique({
+      where: { slug: req.params.slug },
+      include: landingPageInclude,
+    });
+    if (!page || !page.isActive)
+      return res.status(404).json({ message: "Landing page not found" });
+
+    const extraInkIds: number[] = page.extraInkProductIds ?? [];
+
+    const [freeGiftProduct, extraInkProducts] = await Promise.all([
       prisma.product.findFirst({
         where: { isFreeGift: true, isTrashed: false },
         include: {
@@ -70,10 +75,30 @@ export async function getLandingPageBySlug(req: Request, res: Response) {
           },
         },
       }),
+      extraInkIds.length > 0
+        ? prisma.product.findMany({
+            where: { id: { in: extraInkIds }, isTrashed: false },
+            include: {
+              variants: {
+                where: { isActive: true },
+                orderBy: { isDefault: "desc" as const },
+                select: { id: true, title: true, color: true, size: true, regularPrice: true, salePrice: true, stock: true, images: true, isDefault: true, isActive: true },
+              },
+            },
+          })
+        : prisma.product.findMany({
+            where: { type: "ink", isTrashed: false },
+            include: {
+              variants: {
+                where: { isActive: true },
+                orderBy: { isDefault: "desc" as const },
+                select: { id: true, title: true, color: true, size: true, regularPrice: true, salePrice: true, stock: true, images: true, isDefault: true, isActive: true },
+              },
+            },
+          }),
     ]);
-    if (!page || !page.isActive)
-      return res.status(404).json({ message: "Landing page not found" });
-    return res.json({ page: { ...page, freeGiftProduct: freeGiftProduct ?? null } });
+
+    return res.json({ page: { ...page, freeGiftProduct: freeGiftProduct ?? null, extraInkProducts } });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }
