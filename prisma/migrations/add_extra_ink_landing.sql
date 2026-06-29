@@ -1,1 +1,0 @@
-ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "isShowAsExtraInkInLandingPage" BOOLEAN NOT NULL DEFAULT false;

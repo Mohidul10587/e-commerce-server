@@ -1,1 +1,0 @@
-ALTER TABLE "LandingPage" ADD COLUMN IF NOT EXISTS "extraInkProductIds" INTEGER[] NOT NULL DEFAULT '{}';
