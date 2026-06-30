@@ -104,6 +104,7 @@ model LandingPage {
   slug                    String               @unique
   title                   String
   isActive                Boolean              @default(true)
+  isTrashed               Boolean              @default(false)
   headingText             String?
   youtubeVideoUrl         String?
   heroDesktopImageUrls    String[]

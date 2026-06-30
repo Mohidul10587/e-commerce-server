@@ -36,14 +36,28 @@ const landingPageInclude = {
 export async function getLandingPages(_req: Request, res: Response) {
   try {
     const pages = await prisma.landingPage.findMany({
+      where: { isTrashed: false },
       orderBy: { createdAt: "desc" },
       include: {
         products: {
-          select: {
-            id: true,
-            productId: true,
-            displayOrder: true,
-          },
+          select: { id: true, productId: true, displayOrder: true },
+        },
+      },
+    });
+    return res.json({ pages });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
+export async function getTrashedLandingPages(_req: Request, res: Response) {
+  try {
+    const pages = await prisma.landingPage.findMany({
+      where: { isTrashed: true },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        products: {
+          select: { id: true, productId: true, displayOrder: true },
         },
       },
     });
@@ -59,7 +73,7 @@ export async function getLandingPageBySlug(req: Request, res: Response) {
       where: { slug: req.params.slug },
       include: landingPageInclude,
     });
-    if (!page || !page.isActive)
+    if (!page || !page.isActive || page.isTrashed)
       return res.status(404).json({ message: "Landing page not found" });
 
     const extraInkIds: number[] = page.extraInkProductIds ?? [];
@@ -171,7 +185,6 @@ export async function updateLandingPage(req: Request, res: Response) {
     const page = await prisma.$transaction(async (tx) => {
       await tx.landingPage.update({ where: { id }, data: pageData });
 
-      // Sync products: delete removed, upsert existing/new
       const incoming = products;
       const incomingWithId = incoming.filter((p) => p.id);
       const incomingIds = incomingWithId.map((p) => p.id!);
@@ -207,11 +220,51 @@ export async function updateLandingPage(req: Request, res: Response) {
   }
 }
 
+export async function trashLandingPage(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    const page = await prisma.landingPage.findUnique({ where: { id } });
+    if (!page)
+      return res.status(404).json({ message: "Landing page not found" });
+
+    await prisma.landingPage.update({
+      where: { id },
+      data: { isTrashed: true, isActive: false },
+    });
+    return res.json({ message: "Landing page moved to trash" });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
+export async function restoreLandingPage(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id);
+    const page = await prisma.landingPage.findUnique({ where: { id } });
+    if (!page)
+      return res.status(404).json({ message: "Landing page not found" });
+
+    await prisma.landingPage.update({
+      where: { id },
+      data: { isTrashed: false },
+    });
+    return res.json({ message: "Landing page restored" });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
 export async function deleteLandingPage(req: Request, res: Response) {
   try {
     const id = parseInt(req.params.id);
+    const page = await prisma.landingPage.findUnique({ where: { id } });
+    if (!page)
+      return res.status(404).json({ message: "Landing page not found" });
+    if (!page.isTrashed)
+      return res.status(400).json({ message: "Move to trash first before permanent delete" });
+
     await prisma.landingPage.delete({ where: { id } });
-    return res.json({ message: "Landing page deleted" });
+    return res.json({ message: "Landing page permanently deleted" });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
   }
