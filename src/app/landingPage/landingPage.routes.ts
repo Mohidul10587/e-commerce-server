@@ -11,20 +11,22 @@ import {
   deleteLandingPage,
   emptyTrash,
 } from "./landingPage.controller";
-import { verifyAdmin } from "../../middleware/auth";
+import { verifyAdmin, verifyAdminOrManager } from "../../middleware/auth";
 
 export const landingPageRoutes = Router();
 
 // Public
 landingPageRoutes.get("/slug/:slug", getLandingPageBySlug);
 
-// Admin
-landingPageRoutes.get("/", verifyAdmin, getLandingPages);
-landingPageRoutes.get("/trashed", verifyAdmin, getTrashedLandingPages);
-landingPageRoutes.get("/:id", verifyAdmin, getLandingPageById);
-landingPageRoutes.post("/", verifyAdmin, createLandingPage);
-landingPageRoutes.put("/:id", verifyAdmin, updateLandingPage);
-landingPageRoutes.patch("/:id/trash", verifyAdmin, trashLandingPage);
-landingPageRoutes.patch("/:id/restore", verifyAdmin, restoreLandingPage);
-landingPageRoutes.delete("/trash/empty", verifyAdmin, emptyTrash);
+// Admin + Manager
+landingPageRoutes.get("/", verifyAdminOrManager, getLandingPages);
+landingPageRoutes.get("/trashed", verifyAdminOrManager, getTrashedLandingPages);
+landingPageRoutes.get("/:id", verifyAdminOrManager, getLandingPageById);
+landingPageRoutes.post("/", verifyAdminOrManager, createLandingPage);
+landingPageRoutes.put("/:id", verifyAdminOrManager, updateLandingPage);
+landingPageRoutes.patch("/:id/trash", verifyAdminOrManager, trashLandingPage);
+landingPageRoutes.patch("/:id/restore", verifyAdminOrManager, restoreLandingPage);
+landingPageRoutes.delete("/trash/empty", verifyAdminOrManager, emptyTrash);
+
+// Permanent delete — admin only
 landingPageRoutes.delete("/:id", verifyAdmin, deleteLandingPage);

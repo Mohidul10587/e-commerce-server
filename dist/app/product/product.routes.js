@@ -17,8 +17,9 @@ exports.productRoutes.post("/:id/copy", auth_1.verifyAdminOrManager, product_con
 exports.productRoutes.put("/:id", auth_1.verifyAdminOrManager, product_controller_1.updateProduct);
 exports.productRoutes.patch("/variants/:variantId/stock", auth_1.verifyAdminOrManager, product_controller_1.updateVariantStock);
 exports.productRoutes.get("/variants/:variantId/stock-history", auth_1.verifyAdminOrManager, product_controller_1.getStockHistory);
-// Admin only — delete
-exports.productRoutes.delete("/:id", auth_1.verifyAdmin, product_controller_1.moveToTrash);
-exports.productRoutes.patch("/:id/restore", auth_1.verifyAdmin, product_controller_1.restoreFromTrash);
+// Trash/restore — manager allowed
+exports.productRoutes.delete("/:id", auth_1.verifyAdminOrManager, product_controller_1.moveToTrash);
+exports.productRoutes.patch("/:id/restore", auth_1.verifyAdminOrManager, product_controller_1.restoreFromTrash);
+exports.productRoutes.delete("/trash/empty", auth_1.verifyAdminOrManager, product_controller_1.emptyProductTrash);
+// Permanent delete — admin only
 exports.productRoutes.delete("/:id/permanent", auth_1.verifyAdmin, product_controller_1.permanentDeleteProduct);
-exports.productRoutes.delete("/trash/empty", auth_1.verifyAdmin, product_controller_1.emptyProductTrash);

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyAdminManagerSupportDesignerOrProduction = exports.verifyAdminManagerSupportOrProduction = exports.verifyAdminManagerSupportOrDesigner = exports.verifyAdminManagerOrSupport = exports.verifyAdminOrManager = exports.verifyAdmin = exports.verifyUserInactive = exports.verifyUser = exports.verifyActiveUser = exports.requireRoles = exports.authenticate = void 0;
+exports.verifyAdminManagerSupportDesignerOrProduction = exports.verifyAdminManagerSupportOrProduction = exports.verifyAdminManagerDesignerOrSupport = exports.verifyAdminManagerSupportOrDesigner = exports.verifyAdminManagerOrSupport = exports.verifyAdminOrManager = exports.verifyAdmin = exports.verifyUserInactive = exports.verifyUser = exports.verifyActiveUser = exports.requireRoles = exports.authenticate = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../lib/prisma"));
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -102,5 +102,6 @@ exports.verifyAdmin = [exports.authenticate, exports.verifyActiveUser, (0, expor
 exports.verifyAdminOrManager = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager")];
 exports.verifyAdminManagerOrSupport = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager", "support")];
 exports.verifyAdminManagerSupportOrDesigner = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager", "support", "designer")];
+exports.verifyAdminManagerDesignerOrSupport = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager", "designer", "support")];
 exports.verifyAdminManagerSupportOrProduction = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager", "support", "production")];
 exports.verifyAdminManagerSupportDesignerOrProduction = [exports.authenticate, exports.verifyActiveUser, (0, exports.requireRoles)("admin", "manager", "support", "designer", "production")];

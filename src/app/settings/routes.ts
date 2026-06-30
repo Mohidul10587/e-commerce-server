@@ -5,7 +5,7 @@ import { verifyAdmin, verifyAdminOrManager } from "../../middleware/auth";
 const router = Router();
 
 router.get("/", getSettings);
-router.put("/", verifyAdminOrManager, updateSettings);
+router.put("/", verifyAdmin, updateSettings);
 router.post("/banners", verifyAdmin, addBanner);
 router.delete("/banners/:id", verifyAdmin, deleteBanner);
 

@@ -11,10 +11,10 @@ exports.orderRoutes.get("/public-stats", order_controller_1.getPublicStats);
 // All other routes require auth
 exports.orderRoutes.use(auth_1.verifyAdminManagerSupportDesignerOrProduction);
 // Bulk routes (must be before /:id)
-exports.orderRoutes.post("/bulk/trash", auth_1.verifyAdminManagerOrSupport, order_controller_1.bulkTrashOrders);
-exports.orderRoutes.post("/bulk/restore", auth_1.verifyAdminManagerOrSupport, order_controller_1.bulkRestoreOrders);
-exports.orderRoutes.post("/bulk/status", auth_1.verifyAdminManagerOrSupport, order_controller_1.bulkUpdateOrderStatus);
-exports.orderRoutes.post("/bulk/assign-designer", auth_1.verifyAdminManagerOrSupport, order_controller_1.bulkAssignDesigner);
+exports.orderRoutes.post("/bulk/trash", auth_1.verifyAdminManagerDesignerOrSupport, order_controller_1.bulkTrashOrders);
+exports.orderRoutes.post("/bulk/restore", auth_1.verifyAdminManagerDesignerOrSupport, order_controller_1.bulkRestoreOrders);
+exports.orderRoutes.post("/bulk/status", auth_1.verifyAdminManagerDesignerOrSupport, order_controller_1.bulkUpdateOrderStatus);
+exports.orderRoutes.post("/bulk/assign-designer", auth_1.verifyAdminManagerDesignerOrSupport, order_controller_1.bulkAssignDesigner);
 // Item-level routes
 exports.orderRoutes.patch("/items/:itemId/seal-text", auth_1.verifyAdminManagerSupportOrDesigner, order_controller_1.updateOrderItemSealText);
 exports.orderRoutes.patch("/items/:itemId/quantity", auth_1.verifyAdminManagerSupportOrDesigner, order_controller_1.updateOrderItemQuantity);
@@ -38,4 +38,4 @@ exports.orderRoutes.put("/:id", auth_1.verifyAdminManagerSupportOrDesigner, orde
 exports.orderRoutes.patch("/:id/restore", auth_1.verifyAdminManagerSupportOrDesigner, order_controller_1.restoreOrder);
 exports.orderRoutes.delete("/:id/permanent", auth_1.verifyAdmin, order_controller_1.permanentDeleteOrder);
 exports.orderRoutes.delete("/trash/empty", auth_1.verifyAdmin, order_controller_1.emptyOrderTrash);
-exports.orderRoutes.delete("/:id", auth_1.verifyAdminManagerOrSupport, order_controller_1.moveOrderToTrash);
+exports.orderRoutes.delete("/:id", auth_1.verifyAdminManagerDesignerOrSupport, order_controller_1.moveOrderToTrash);

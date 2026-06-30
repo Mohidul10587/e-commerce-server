@@ -12,12 +12,12 @@ router.get("/me", controller_1.me);
 router.post("/refresh", controller_1.refresh);
 router.post("/logout", controller_1.logout);
 router.put("/change-password", auth_1.verifyUser, controller_1.changePassword);
-// Manager can view & create/update users, but NOT remove admins (admin-only for delete/restore)
 router.get("/designers", auth_1.verifyAdminManagerSupportDesignerOrProduction, controller_1.getDesigners);
 router.get("/", auth_1.verifyAdminOrManager, controller_1.getUsers);
-router.post("/", auth_1.verifyAdmin, controller_1.createUser);
-router.put("/:id", auth_1.verifyAdmin, controller_1.updateUser);
-router.delete("/trash/empty", auth_1.verifyAdmin, controller_1.emptyUserTrash);
-router.delete("/:id", auth_1.verifyAdmin, controller_1.moveUserToTrash);
-router.patch("/:id/restore", auth_1.verifyAdmin, controller_1.restoreUser);
+router.post("/", auth_1.verifyAdminOrManager, controller_1.createUser);
+router.put("/:id", auth_1.verifyAdminOrManager, controller_1.updateUser);
+router.delete("/trash/empty", auth_1.verifyAdminOrManager, controller_1.emptyUserTrash);
+router.delete("/:id", auth_1.verifyAdminOrManager, controller_1.moveUserToTrash);
+router.patch("/:id/restore", auth_1.verifyAdminOrManager, controller_1.restoreUser);
+// Permanent delete — admin only
 router.delete("/:id/permanent", auth_1.verifyAdmin, controller_1.permanentDeleteUser);

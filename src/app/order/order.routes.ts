@@ -10,7 +10,7 @@ import {
   getOrderForDesigner, designerSubmitDesign,
   getDesignerDashboardOrders,
 } from "./order.controller";
-import { verifyAdminManagerSupportDesignerOrProduction, verifyAdminManagerOrSupport, verifyAdminManagerSupportOrDesigner, verifyAdmin, verifyUser } from "../../middleware/auth";
+import { verifyAdminManagerSupportDesignerOrProduction, verifyAdminManagerOrSupport, verifyAdminManagerSupportOrDesigner, verifyAdminManagerDesignerOrSupport, verifyAdmin, verifyUser } from "../../middleware/auth";
 
 export const orderRoutes = Router();
 
@@ -22,10 +22,10 @@ orderRoutes.get("/public-stats", getPublicStats);
 orderRoutes.use(verifyAdminManagerSupportDesignerOrProduction);
 
 // Bulk routes (must be before /:id)
-orderRoutes.post("/bulk/trash", verifyAdminManagerOrSupport, bulkTrashOrders);
-orderRoutes.post("/bulk/restore", verifyAdminManagerOrSupport, bulkRestoreOrders);
-orderRoutes.post("/bulk/status", verifyAdminManagerOrSupport, bulkUpdateOrderStatus);
-orderRoutes.post("/bulk/assign-designer", verifyAdminManagerOrSupport, bulkAssignDesigner);
+orderRoutes.post("/bulk/trash", verifyAdminManagerDesignerOrSupport, bulkTrashOrders);
+orderRoutes.post("/bulk/restore", verifyAdminManagerDesignerOrSupport, bulkRestoreOrders);
+orderRoutes.post("/bulk/status", verifyAdminManagerDesignerOrSupport, bulkUpdateOrderStatus);
+orderRoutes.post("/bulk/assign-designer", verifyAdminManagerDesignerOrSupport, bulkAssignDesigner);
 
 // Item-level routes
 orderRoutes.patch("/items/:itemId/seal-text", verifyAdminManagerSupportOrDesigner, updateOrderItemSealText);
@@ -51,4 +51,4 @@ orderRoutes.put("/:id", verifyAdminManagerSupportOrDesigner, updateOrder);
 orderRoutes.patch("/:id/restore", verifyAdminManagerSupportOrDesigner, restoreOrder);
 orderRoutes.delete("/:id/permanent", verifyAdmin, permanentDeleteOrder);
 orderRoutes.delete("/trash/empty", verifyAdmin, emptyOrderTrash);
-orderRoutes.delete("/:id", verifyAdminManagerOrSupport, moveOrderToTrash);
+orderRoutes.delete("/:id", verifyAdminManagerDesignerOrSupport, moveOrderToTrash);

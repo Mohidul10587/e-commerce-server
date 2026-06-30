@@ -23,8 +23,10 @@ productRoutes.put("/:id", verifyAdminOrManager, updateProduct);
 productRoutes.patch("/variants/:variantId/stock", verifyAdminOrManager, updateVariantStock);
 productRoutes.get("/variants/:variantId/stock-history", verifyAdminOrManager, getStockHistory);
 
-// Admin only — delete
-productRoutes.delete("/:id", verifyAdmin, moveToTrash);
-productRoutes.patch("/:id/restore", verifyAdmin, restoreFromTrash);
+// Trash/restore — manager allowed
+productRoutes.delete("/:id", verifyAdminOrManager, moveToTrash);
+productRoutes.patch("/:id/restore", verifyAdminOrManager, restoreFromTrash);
+productRoutes.delete("/trash/empty", verifyAdminOrManager, emptyProductTrash);
+
+// Permanent delete — admin only
 productRoutes.delete("/:id/permanent", verifyAdmin, permanentDeleteProduct);
-productRoutes.delete("/trash/empty", verifyAdmin, emptyProductTrash);

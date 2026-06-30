@@ -86,5 +86,6 @@ export const verifyAdmin = [authenticate, verifyActiveUser, requireRoles("admin"
 export const verifyAdminOrManager = [authenticate, verifyActiveUser, requireRoles("admin", "manager")];
 export const verifyAdminManagerOrSupport = [authenticate, verifyActiveUser, requireRoles("admin", "manager", "support")];
 export const verifyAdminManagerSupportOrDesigner = [authenticate, verifyActiveUser, requireRoles("admin", "manager", "support", "designer")];
+export const verifyAdminManagerDesignerOrSupport = [authenticate, verifyActiveUser, requireRoles("admin", "manager", "designer", "support")];
 export const verifyAdminManagerSupportOrProduction = [authenticate, verifyActiveUser, requireRoles("admin", "manager", "support", "production")];
 export const verifyAdminManagerSupportDesignerOrProduction = [authenticate, verifyActiveUser, requireRoles("admin", "manager", "support", "designer", "production")];
