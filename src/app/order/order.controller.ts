@@ -132,6 +132,7 @@ export const createOrder = async (req: Request, res: Response) => {
     const resolvedItems: {
       variantId: number;
       title: string;
+      sku: string | null;
       price: number;
       quantity: number;
       sealText: string | null;
@@ -158,6 +159,7 @@ export const createOrder = async (req: Request, res: Response) => {
       resolvedItems.push({
         variantId: variant.id,
         title: `${variant.product.title} — ${variant.title}`,
+        sku: variant.sku ?? null,
         price,
         quantity: item.quantity,
         sealText:
@@ -452,6 +454,7 @@ export const updateOrder = async (req: Request, res: Response) => {
       const resolved: {
         variantId: number;
         title: string;
+        sku: string | null;
         price: number;
         quantity: number;
         sealText: string | null;
@@ -478,6 +481,7 @@ export const updateOrder = async (req: Request, res: Response) => {
         resolved.push({
           variantId: variant.id,
           title: `${variant.product.title} — ${variant.title}`,
+          sku: variant.sku ?? null,
           price,
           quantity: qty,
           sealText:
@@ -544,6 +548,7 @@ export const addOrderItem = async (req: Request, res: Response) => {
           orderId,
           variantId: variant.id,
           title: `${variant.product.title} — ${variant.title}`,
+          sku: variant.sku ?? null,
           price: variant.salePrice,
           quantity: qty,
           sealText: isSeal ? sealText || null : null,

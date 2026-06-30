@@ -122,6 +122,7 @@ const getOrderStatusCounts = (_req, res) => __awaiter(void 0, void 0, void 0, fu
 });
 exports.getOrderStatusCounts = getOrderStatusCounts;
 const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { customerName, customerPhone, alternativePhone, address, contactLink, items, deliveryCharge, note, discount, discountPercent, status, } = req.body;
         if (!customerName || !customerPhone || !address || !(items === null || items === void 0 ? void 0 : items.length))
@@ -146,6 +147,7 @@ const createOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             resolvedItems.push({
                 variantId: variant.id,
                 title: `${variant.product.title} — ${variant.title}`,
+                sku: (_a = variant.sku) !== null && _a !== void 0 ? _a : null,
                 price,
                 quantity: item.quantity,
                 sealText: variant.product.type === "seal" ? item.sealText || null : null,
@@ -381,7 +383,7 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.updateOrderStatus = updateOrderStatus;
 const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b;
     try {
         const id = Number(req.params.id);
         const { customerName, customerPhone, alternativePhone, address, contactLink, status, discount, discountPercent, paidAmount, items, note, } = req.body;
@@ -424,6 +426,7 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 resolved.push({
                     variantId: variant.id,
                     title: `${variant.product.title} — ${variant.title}`,
+                    sku: (_a = variant.sku) !== null && _a !== void 0 ? _a : null,
                     price,
                     quantity: qty,
                     sealText: variant.product.type === "seal" ? item.sealText || null : null,
@@ -441,7 +444,7 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         });
         if (!existing)
             return res.status(404).json({ message: "Order not found" });
-        const subtotal = (_a = data.subtotal) !== null && _a !== void 0 ? _a : existing.subtotal;
+        const subtotal = (_b = data.subtotal) !== null && _b !== void 0 ? _b : existing.subtotal;
         const deliveryCharge = existing.deliveryCharge;
         const disc = discount !== undefined &&
             !isNaN(Number(discount)) &&
@@ -469,6 +472,7 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 });
 exports.updateOrder = updateOrder;
 const addOrderItem = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const orderId = Number(req.params.id);
         const { variantId, quantity, sealText } = req.body;
@@ -486,6 +490,7 @@ const addOrderItem = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                     orderId,
                     variantId: variant.id,
                     title: `${variant.product.title} — ${variant.title}`,
+                    sku: (_a = variant.sku) !== null && _a !== void 0 ? _a : null,
                     price: variant.salePrice,
                     quantity: qty,
                     sealText: isSeal ? sealText || null : null,
@@ -501,7 +506,7 @@ const addOrderItem = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         ]);
         return res.json({ item });
     }
-    catch (_a) {
+    catch (_b) {
         return res.status(500).json({ message: "Internal server error" });
     }
 });
