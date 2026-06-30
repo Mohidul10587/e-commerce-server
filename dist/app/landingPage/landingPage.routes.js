@@ -15,4 +15,5 @@ exports.landingPageRoutes.post("/", auth_1.verifyAdmin, landingPage_controller_1
 exports.landingPageRoutes.put("/:id", auth_1.verifyAdmin, landingPage_controller_1.updateLandingPage);
 exports.landingPageRoutes.patch("/:id/trash", auth_1.verifyAdmin, landingPage_controller_1.trashLandingPage);
 exports.landingPageRoutes.patch("/:id/restore", auth_1.verifyAdmin, landingPage_controller_1.restoreLandingPage);
+exports.landingPageRoutes.delete("/trash/empty", auth_1.verifyAdmin, landingPage_controller_1.emptyTrash);
 exports.landingPageRoutes.delete("/:id", auth_1.verifyAdmin, landingPage_controller_1.deleteLandingPage);

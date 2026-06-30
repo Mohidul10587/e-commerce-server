@@ -31,6 +31,7 @@ exports.createLandingPage = createLandingPage;
 exports.updateLandingPage = updateLandingPage;
 exports.trashLandingPage = trashLandingPage;
 exports.restoreLandingPage = restoreLandingPage;
+exports.emptyTrash = emptyTrash;
 exports.deleteLandingPage = deleteLandingPage;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
 const landingPage_validation_1 = require("./landingPage.validation");
@@ -278,6 +279,17 @@ function restoreLandingPage(req, res) {
                 data: { isTrashed: false },
             });
             return res.json({ message: "Landing page restored" });
+        }
+        catch (error) {
+            return res.status(500).json({ message: "Server error", error });
+        }
+    });
+}
+function emptyTrash(_req, res) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { count } = yield prisma_1.default.landingPage.deleteMany({ where: { isTrashed: true } });
+            return res.json({ message: `${count} landing page(s) permanently deleted` });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });

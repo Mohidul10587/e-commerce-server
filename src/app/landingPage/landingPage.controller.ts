@@ -254,6 +254,15 @@ export async function restoreLandingPage(req: Request, res: Response) {
   }
 }
 
+export async function emptyTrash(_req: Request, res: Response) {
+  try {
+    const { count } = await prisma.landingPage.deleteMany({ where: { isTrashed: true } });
+    return res.json({ message: `${count} landing page(s) permanently deleted` });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+}
+
 export async function deleteLandingPage(req: Request, res: Response) {
   try {
     const id = parseInt(req.params.id);

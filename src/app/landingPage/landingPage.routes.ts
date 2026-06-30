@@ -9,6 +9,7 @@ import {
   trashLandingPage,
   restoreLandingPage,
   deleteLandingPage,
+  emptyTrash,
 } from "./landingPage.controller";
 import { verifyAdmin } from "../../middleware/auth";
 
@@ -25,4 +26,5 @@ landingPageRoutes.post("/", verifyAdmin, createLandingPage);
 landingPageRoutes.put("/:id", verifyAdmin, updateLandingPage);
 landingPageRoutes.patch("/:id/trash", verifyAdmin, trashLandingPage);
 landingPageRoutes.patch("/:id/restore", verifyAdmin, restoreLandingPage);
+landingPageRoutes.delete("/trash/empty", verifyAdmin, emptyTrash);
 landingPageRoutes.delete("/:id", verifyAdmin, deleteLandingPage);
