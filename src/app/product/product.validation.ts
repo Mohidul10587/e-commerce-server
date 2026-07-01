@@ -9,6 +9,7 @@ const variantSchema = z.object({
   salePrice: z.number().positive(),
   purchasePrice: z.number().positive(),
   stock: z.number().int().min(0),
+  lowStockThreshold: z.number().int().min(0).optional().default(0),
   sku: z.string().min(1),
   images: z.array(z.string()),
   isDefault: z.boolean(),
@@ -23,7 +24,6 @@ export const createProductSchema = z.object({
   seoDescription: z.string().optional(),
   keywords: z.array(z.string()).optional(),
   type: z.enum(["seal", "ink"]),
-  lowStockThreshold: z.number().int().min(0).optional(),
   isFreeGift: z.boolean().optional(),
   variants: z.array(variantSchema).min(1, "At least one variant is required"),
 }).refine(

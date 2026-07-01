@@ -2,12 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateLandingPageSchema = exports.createLandingPageSchema = void 0;
 const zod_1 = require("zod");
-const landingPageProductSchema = zod_1.z.object({
-    id: zod_1.z.number().int().positive().optional(),
-    productId: zod_1.z.number().int().positive(),
-    selectedVariantIds: zod_1.z.array(zod_1.z.number().int().positive()).default([]),
-    displayOrder: zod_1.z.number().int().min(0).default(0),
-});
 exports.createLandingPageSchema = zod_1.z.object({
     slug: zod_1.z.string().min(1),
     title: zod_1.z.string().min(1),
@@ -26,6 +20,8 @@ exports.createLandingPageSchema = zod_1.z.object({
     whyNeededDescription: zod_1.z.string().optional(),
     customerReviewImageUrls: zod_1.z.array(zod_1.z.string()).optional().default([]),
     extraInkProductIds: zod_1.z.array(zod_1.z.number().int().positive()).optional().default([]),
-    products: zod_1.z.array(landingPageProductSchema).optional().default([]),
+    // Simplified product fields
+    productId: zod_1.z.number().int().positive().optional(),
+    selectedVariantIds: zod_1.z.array(zod_1.z.number().int().positive()).optional().default([]),
 });
 exports.updateLandingPageSchema = exports.createLandingPageSchema;

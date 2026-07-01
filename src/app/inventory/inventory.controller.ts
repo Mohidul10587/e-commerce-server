@@ -48,11 +48,10 @@ export async function getInventoryStats(_req: Request, res: Response) {
         select: {
           id: true,
           title: true,
-          lowStockThreshold: true,
           totalStock: true,
           variants: {
             where: { isActive: true, stock: { gt: 0 } },
-            select: { id: true, title: true, sku: true, stock: true },
+            select: { id: true, title: true, sku: true, stock: true, lowStockThreshold: true },
           },
         },
       }),
@@ -92,7 +91,7 @@ export async function getInventoryStats(_req: Request, res: Response) {
       .map((p: any) => ({
         ...p,
         variants: p.variants.filter((v: any) => {
-          const threshold = p.lowStockThreshold > 0 ? p.lowStockThreshold : LOW_STOCK_THRESHOLD;
+          const threshold = v.lowStockThreshold > 0 ? v.lowStockThreshold : LOW_STOCK_THRESHOLD;
           return v.stock > 0 && v.stock <= threshold;
         }),
       }))
@@ -214,10 +213,15 @@ export async function getStockList(req: Request, res: Response) {
     // filter by stock status if provided
     const filtered = stockStatus
       ? products.filter((p) => {
-          const threshold = p.lowStockThreshold > 0 ? p.lowStockThreshold : LOW_STOCK_THRESHOLD;
           if (stockStatus === "out") return p.variants.some((v) => v.stock === 0);
-          if (stockStatus === "low") return p.variants.some((v) => v.stock > 0 && v.stock <= threshold);
-          if (stockStatus === "in") return p.variants.every((v) => v.stock > threshold);
+          if (stockStatus === "low") return p.variants.some((v) => {
+            const threshold = v.lowStockThreshold > 0 ? v.lowStockThreshold : LOW_STOCK_THRESHOLD;
+            return v.stock > 0 && v.stock <= threshold;
+          });
+          if (stockStatus === "in") return p.variants.every((v) => {
+            const threshold = v.lowStockThreshold > 0 ? v.lowStockThreshold : LOW_STOCK_THRESHOLD;
+            return v.stock > threshold;
+          });
           return true;
         })
       : products;

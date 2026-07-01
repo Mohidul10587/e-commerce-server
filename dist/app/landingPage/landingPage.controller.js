@@ -35,28 +35,23 @@ exports.emptyTrash = emptyTrash;
 exports.deleteLandingPage = deleteLandingPage;
 const prisma_1 = __importDefault(require("../../lib/prisma"));
 const landingPage_validation_1 = require("./landingPage.validation");
-const landingPageInclude = {
-    products: {
-        orderBy: { displayOrder: "asc" },
+const productInclude = {
+    product: {
         include: {
-            product: {
-                include: {
-                    variants: {
-                        where: { isActive: true },
-                        orderBy: { isDefault: "desc" },
-                        select: {
-                            id: true,
-                            title: true,
-                            size: true,
-                            color: true,
-                            regularPrice: true,
-                            salePrice: true,
-                            stock: true,
-                            images: true,
-                            isDefault: true,
-                            isActive: true,
-                        },
-                    },
+            variants: {
+                where: { isActive: true },
+                orderBy: { isDefault: "desc" },
+                select: {
+                    id: true,
+                    title: true,
+                    size: true,
+                    color: true,
+                    regularPrice: true,
+                    salePrice: true,
+                    stock: true,
+                    images: true,
+                    isDefault: true,
+                    isActive: true,
                 },
             },
         },
@@ -68,10 +63,15 @@ function getLandingPages(_req, res) {
             const pages = yield prisma_1.default.landingPage.findMany({
                 where: { isTrashed: false },
                 orderBy: { createdAt: "desc" },
-                include: {
-                    products: {
-                        select: { id: true, productId: true, displayOrder: true },
-                    },
+                select: {
+                    id: true,
+                    slug: true,
+                    title: true,
+                    isActive: true,
+                    isTrashed: true,
+                    productId: true,
+                    createdAt: true,
+                    updatedAt: true,
                 },
             });
             return res.json({ pages });
@@ -87,10 +87,15 @@ function getTrashedLandingPages(_req, res) {
             const pages = yield prisma_1.default.landingPage.findMany({
                 where: { isTrashed: true },
                 orderBy: { updatedAt: "desc" },
-                include: {
-                    products: {
-                        select: { id: true, productId: true, displayOrder: true },
-                    },
+                select: {
+                    id: true,
+                    slug: true,
+                    title: true,
+                    isActive: true,
+                    isTrashed: true,
+                    productId: true,
+                    createdAt: true,
+                    updatedAt: true,
                 },
             });
             return res.json({ pages });
@@ -106,7 +111,7 @@ function getLandingPageBySlug(req, res) {
         try {
             const page = yield prisma_1.default.landingPage.findUnique({
                 where: { slug: req.params.slug },
-                include: landingPageInclude,
+                include: productInclude,
             });
             if (!page || !page.isActive || page.isTrashed)
                 return res.status(404).json({ message: "Landing page not found" });
@@ -118,7 +123,18 @@ function getLandingPageBySlug(req, res) {
                         variants: {
                             where: { isActive: true },
                             orderBy: { isDefault: "desc" },
-                            select: { id: true, title: true, color: true, size: true, regularPrice: true, salePrice: true, stock: true, images: true, isDefault: true, isActive: true },
+                            select: {
+                                id: true,
+                                title: true,
+                                color: true,
+                                size: true,
+                                regularPrice: true,
+                                salePrice: true,
+                                stock: true,
+                                images: true,
+                                isDefault: true,
+                                isActive: true,
+                            },
                         },
                     },
                 }),
@@ -129,7 +145,18 @@ function getLandingPageBySlug(req, res) {
                             variants: {
                                 where: { isActive: true },
                                 orderBy: { isDefault: "desc" },
-                                select: { id: true, title: true, color: true, size: true, regularPrice: true, salePrice: true, stock: true, images: true, isDefault: true, isActive: true },
+                                select: {
+                                    id: true,
+                                    title: true,
+                                    color: true,
+                                    size: true,
+                                    regularPrice: true,
+                                    salePrice: true,
+                                    stock: true,
+                                    images: true,
+                                    isDefault: true,
+                                    isActive: true,
+                                },
                             },
                         },
                     })
@@ -139,12 +166,25 @@ function getLandingPageBySlug(req, res) {
                             variants: {
                                 where: { isActive: true },
                                 orderBy: { isDefault: "desc" },
-                                select: { id: true, title: true, color: true, size: true, regularPrice: true, salePrice: true, stock: true, images: true, isDefault: true, isActive: true },
+                                select: {
+                                    id: true,
+                                    title: true,
+                                    color: true,
+                                    size: true,
+                                    regularPrice: true,
+                                    salePrice: true,
+                                    stock: true,
+                                    images: true,
+                                    isDefault: true,
+                                    isActive: true,
+                                },
                             },
                         },
                     }),
             ]);
-            return res.json({ page: Object.assign(Object.assign({}, page), { freeGiftProduct: freeGiftProduct !== null && freeGiftProduct !== void 0 ? freeGiftProduct : null, extraInkProducts }) });
+            return res.json({
+                page: Object.assign(Object.assign({}, page), { freeGiftProduct: freeGiftProduct !== null && freeGiftProduct !== void 0 ? freeGiftProduct : null, extraInkProducts }),
+            });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });
@@ -157,7 +197,7 @@ function getLandingPageById(req, res) {
             const id = parseInt(req.params.id);
             const page = yield prisma_1.default.landingPage.findUnique({
                 where: { id },
-                include: landingPageInclude,
+                include: productInclude,
             });
             if (!page)
                 return res.status(404).json({ message: "Landing page not found" });
@@ -176,20 +216,15 @@ function createLandingPage(req, res) {
                 return res
                     .status(400)
                     .json({ message: "Validation error", errors: parsed.error.flatten() });
-            const _a = parsed.data, { products } = _a, pageData = __rest(_a, ["products"]);
+            const _a = parsed.data, { productId, selectedVariantIds } = _a, pageData = __rest(_a, ["productId", "selectedVariantIds"]);
             const slugExists = yield prisma_1.default.landingPage.findUnique({
                 where: { slug: pageData.slug },
             });
             if (slugExists)
                 return res.status(409).json({ message: "Slug already exists" });
             const page = yield prisma_1.default.landingPage.create({
-                data: Object.assign(Object.assign({}, pageData), { products: {
-                        create: products.map((_a) => {
-                            var { id: _id } = _a, p = __rest(_a, ["id"]);
-                            return p;
-                        }),
-                    } }),
-                include: landingPageInclude,
+                data: Object.assign(Object.assign({}, pageData), { productId: productId !== null && productId !== void 0 ? productId : null, selectedVariantIds: selectedVariantIds !== null && selectedVariantIds !== void 0 ? selectedVariantIds : [] }),
+                include: productInclude,
             });
             return res.status(201).json({ message: "Landing page created", page });
         }
@@ -208,40 +243,17 @@ function updateLandingPage(req, res) {
                 return res
                     .status(400)
                     .json({ message: "Validation error", errors: parsed.error.flatten() });
-            const _a = parsed.data, { products } = _a, pageData = __rest(_a, ["products"]);
+            const _a = parsed.data, { productId, selectedVariantIds } = _a, pageData = __rest(_a, ["productId", "selectedVariantIds"]);
             const slugExists = yield prisma_1.default.landingPage.findFirst({
                 where: { slug: pageData.slug, NOT: { id } },
             });
             if (slugExists)
                 return res.status(409).json({ message: "Slug already exists" });
-            const page = yield prisma_1.default.$transaction((tx) => __awaiter(this, void 0, void 0, function* () {
-                yield tx.landingPage.update({ where: { id }, data: pageData });
-                const incoming = products;
-                const incomingWithId = incoming.filter((p) => p.id);
-                const incomingIds = incomingWithId.map((p) => p.id);
-                yield tx.landingPageProduct.deleteMany({
-                    where: { landingPageId: id, id: { notIn: incomingIds } },
-                });
-                for (const p of incoming) {
-                    if (p.id) {
-                        const { id: pid, productId: _pid } = p, rest = __rest(p, ["id", "productId"]);
-                        yield tx.landingPageProduct.update({
-                            where: { id: pid },
-                            data: rest,
-                        });
-                    }
-                    else {
-                        const { id: _id } = p, rest = __rest(p, ["id"]);
-                        yield tx.landingPageProduct.create({
-                            data: Object.assign(Object.assign({}, rest), { landingPageId: id }),
-                        });
-                    }
-                }
-                return tx.landingPage.findUniqueOrThrow({
-                    where: { id },
-                    include: landingPageInclude,
-                });
-            }));
+            const page = yield prisma_1.default.landingPage.update({
+                where: { id },
+                data: Object.assign(Object.assign({}, pageData), { productId: productId !== null && productId !== void 0 ? productId : null, selectedVariantIds: selectedVariantIds !== null && selectedVariantIds !== void 0 ? selectedVariantIds : [] }),
+                include: productInclude,
+            });
             return res.json({ message: "Landing page updated", page });
         }
         catch (error) {
@@ -288,8 +300,12 @@ function restoreLandingPage(req, res) {
 function emptyTrash(_req, res) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { count } = yield prisma_1.default.landingPage.deleteMany({ where: { isTrashed: true } });
-            return res.json({ message: `${count} landing page(s) permanently deleted` });
+            const { count } = yield prisma_1.default.landingPage.deleteMany({
+                where: { isTrashed: true },
+            });
+            return res.json({
+                message: `${count} landing page(s) permanently deleted`,
+            });
         }
         catch (error) {
             return res.status(500).json({ message: "Server error", error });
@@ -304,7 +320,9 @@ function deleteLandingPage(req, res) {
             if (!page)
                 return res.status(404).json({ message: "Landing page not found" });
             if (!page.isTrashed)
-                return res.status(400).json({ message: "Move to trash first before permanent delete" });
+                return res
+                    .status(400)
+                    .json({ message: "Move to trash first before permanent delete" });
             yield prisma_1.default.landingPage.delete({ where: { id } });
             return res.json({ message: "Landing page permanently deleted" });
         }

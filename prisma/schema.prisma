@@ -100,11 +100,11 @@ model Banner {
 }
 
 model LandingPage {
-  id                      Int                  @id @default(autoincrement())
-  slug                    String               @unique
+  id                      Int      @id @default(autoincrement())
+  slug                    String   @unique
   title                   String
-  isActive                Boolean              @default(true)
-  isTrashed               Boolean              @default(false)
+  isActive                Boolean  @default(true)
+  isTrashed               Boolean  @default(false)
   headingText             String?
   youtubeVideoUrl         String?
   heroDesktopImageUrls    String[]
@@ -119,58 +119,51 @@ model LandingPage {
   whyNeededDescription    String?
   customerReviewImageUrls String[]
   extraInkProductIds      Int[]
-  products                LandingPageProduct[]
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
-}
-
-model LandingPageProduct {
-  id                 Int         @id @default(autoincrement())
-  landingPageId      Int
-  landingPage        LandingPage @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
-  productId          Int
-  product            Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  selectedVariantIds Int[]
-  displayOrder       Int         @default(0)
+  // Direct product relationship (simplified)
+  productId               Int?
+  product                 Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  selectedVariantIds      Int[]
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 model Product {
-  id                Int                  @id @default(autoincrement())
+  id                Int              @id @default(autoincrement())
   title             String
-  slug              String               @unique
+  slug              String           @unique
   description       String?
   seoTitle          String?
   seoDescription    String?
   keywords          String[]
   type              ProductType
-  totalStock        Int                  @default(0)
-  lowStockThreshold Int                  @default(0)
-  isTrashed         Boolean              @default(false)
-  isFreeGift        Boolean              @default(false)
+  totalStock        Int              @default(0)
+  isTrashed         Boolean          @default(false)
+  isFreeGift        Boolean          @default(false)
   variants          ProductVariant[]
-  landingProducts   LandingPageProduct[]
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  landingPages      LandingPage[]    // Direct relationship
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 }
 
 model ProductVariant {
-  id            Int            @id @default(autoincrement())
-  productId     Int
-  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  title         String
-  size          String?
-  color         String?
-  regularPrice  Float
-  salePrice     Float
-  purchasePrice Float
-  stock         Int            @default(0)
-  sku           String         @unique
-  images        String[]
-  isDefault     Boolean        @default(false)
-  isActive      Boolean        @default(true)
-  stockHistory  StockHistory[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id                 Int            @id @default(autoincrement())
+  productId          Int
+  product            Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title              String
+  size               String?
+  color              String?
+  regularPrice       Float
+  salePrice          Float
+  purchasePrice      Float
+  stock              Int            @default(0)
+  lowStockThreshold  Int            @default(0)
+  sku                String         @unique
+  images             String[]
+  isDefault          Boolean        @default(false)
+  isActive           Boolean        @default(true)
+  stockHistory       StockHistory[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 }
 
 model StockHistory {

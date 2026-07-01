@@ -7,6 +7,7 @@ export interface VariantInput {
   salePrice: number;
   purchasePrice: number;
   stock: number;
+  lowStockThreshold?: number;
   sku: string;
   images: string[];
   isDefault: boolean;
@@ -22,7 +23,6 @@ export interface CreateProductInput {
   keywords?: string[];
   type: "seal" | "ink";
   isFreeGift?: boolean;
-  lowStockThreshold?: number;
   variants: VariantInput[];
 }
 

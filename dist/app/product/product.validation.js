@@ -11,6 +11,7 @@ const variantSchema = zod_1.z.object({
     salePrice: zod_1.z.number().positive(),
     purchasePrice: zod_1.z.number().positive(),
     stock: zod_1.z.number().int().min(0),
+    lowStockThreshold: zod_1.z.number().int().min(0).optional().default(0),
     sku: zod_1.z.string().min(1),
     images: zod_1.z.array(zod_1.z.string()),
     isDefault: zod_1.z.boolean(),
@@ -24,7 +25,6 @@ exports.createProductSchema = zod_1.z.object({
     seoDescription: zod_1.z.string().optional(),
     keywords: zod_1.z.array(zod_1.z.string()).optional(),
     type: zod_1.z.enum(["seal", "ink"]),
-    lowStockThreshold: zod_1.z.number().int().min(0).optional(),
     isFreeGift: zod_1.z.boolean().optional(),
     variants: zod_1.z.array(variantSchema).min(1, "At least one variant is required"),
 }).refine((data) => data.variants.filter((v) => v.isDefault).length === 1, { message: "Exactly one variant must be marked as default", path: ["variants"] });

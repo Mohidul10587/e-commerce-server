@@ -1,12 +1,5 @@
 import { z } from "zod";
 
-const landingPageProductSchema = z.object({
-  id: z.number().int().positive().optional(),
-  productId: z.number().int().positive(),
-  selectedVariantIds: z.array(z.number().int().positive()).default([]),
-  displayOrder: z.number().int().min(0).default(0),
-});
-
 export const createLandingPageSchema = z.object({
   slug: z.string().min(1),
   title: z.string().min(1),
@@ -25,7 +18,9 @@ export const createLandingPageSchema = z.object({
   whyNeededDescription: z.string().optional(),
   customerReviewImageUrls: z.array(z.string()).optional().default([]),
   extraInkProductIds: z.array(z.number().int().positive()).optional().default([]),
-  products: z.array(landingPageProductSchema).optional().default([]),
+  // Simplified product fields
+  productId: z.number().int().positive().optional(),
+  selectedVariantIds: z.array(z.number().int().positive()).optional().default([]),
 });
 
 export const updateLandingPageSchema = createLandingPageSchema;
