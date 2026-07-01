@@ -61,7 +61,7 @@ export async function submitOrderToCourier(
     recipientName: order.customerName,
     recipientPhone: order.customerPhone,
     recipientAddress: order.address,
-    codAmount: order.total,
+    codAmount: Math.max(order.total - order.paidAmount, 0),
     note: order.note ?? undefined,
   };
 

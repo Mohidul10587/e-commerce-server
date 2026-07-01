@@ -63,7 +63,7 @@ function submitOrderToCourier(orderId_1) {
             recipientName: order.customerName,
             recipientPhone: order.customerPhone,
             recipientAddress: order.address,
-            codAmount: order.total,
+            codAmount: Math.max(order.total - order.paidAmount, 0),
             note: (_a = order.note) !== null && _a !== void 0 ? _a : undefined,
         };
         // ── Call provider ──────────────────────────────────────────────────────────
