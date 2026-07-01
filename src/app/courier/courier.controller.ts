@@ -4,8 +4,8 @@ import {
   getStatusByConsignmentId,
   getStatusByInvoice,
   getStatusByTrackingCode,
-  createConsignment,
-} from "./steadfast.service";
+} from "./steadfast.adapter";
+import { submitOrderToCourier } from "./courier.dispatch";
 import { io } from "../../index";
 
 export const trackByCid = async (req: Request, res: Response) => {
@@ -38,49 +38,42 @@ export const trackByTrackingCode = async (req: Request, res: Response) => {
   }
 };
 
-// Manually trigger courier consignment creation for an order
+/**
+ * Manually trigger courier dispatch for an order.
+ * Useful if the automatic InReview dispatch failed (network error etc.).
+ * Idempotent — safe to call multiple times.
+ */
 export const dispatchOrder = async (req: Request, res: Response) => {
   try {
     const orderId = Number(req.params.id);
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    const courier = order.courier as any;
-    if (courier?.consignment_id) {
-      return res.status(409).json({ message: "Consignment already created", courier });
-    }
+    const shipment = await submitOrderToCourier(orderId, "steadfast");
 
-    const invoice = `ORD-${orderId}`;
-    const consignment = await createConsignment({
-      invoice,
-      recipient_name: order.customerName,
-      recipient_phone: order.customerPhone,
-      recipient_address: order.address,
-      cod_amount: order.total,
-      note: order.note ?? undefined,
-    });
-
-    const courierData = {
-      provider: "steadfast",
-      consignment_id: consignment.consignment_id,
-      tracking_code: consignment.tracking_code,
-      invoice: consignment.invoice,
-      status: consignment.status,
-      cod_amount: consignment.cod_amount,
-      delivery_charge: null,
-      last_update: new Date().toISOString(),
-    };
-
-    const updated = await prisma.order.update({
+    // Re-fetch order with updated courier data
+    const updated = await prisma.order.findUniqueOrThrow({
       where: { id: orderId },
-      data: { courier: courierData },
       include: { items: true },
     });
-
     io.emit("order:updated", updated);
-    return res.json({ message: "Consignment created", courier: courierData });
+
+    return res.json({ message: "Consignment created", shipment });
   } catch (err: any) {
     console.error("[Courier] dispatchOrder:", err.message);
     return res.status(502).json({ message: err.message });
+  }
+};
+
+/** Get the CourierShipment record for an order */
+export const getShipment = async (req: Request, res: Response) => {
+  try {
+    const orderId = Number(req.params.id);
+    const shipment = await prisma.courierShipment.findUnique({ where: { orderId } });
+    if (!shipment) return res.status(404).json({ message: "No shipment found for this order" });
+    return res.json({ shipment });
+  } catch (err: any) {
+    console.error("[Courier] getShipment:", err.message);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };

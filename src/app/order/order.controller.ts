@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
 import { io } from "../../index";
-import { createConsignment } from "../courier/steadfast.service";
+import { submitOrderToCourier } from "../courier/courier.dispatch";
 import { sendOrderConfirmationWhatsApp, sendOrderStatusWhatsApp, sendPaymentWhatsApp } from "../../lib/whatsapp.service";
 import { adjustStock, syncProductStock } from "../product/product.service";
 
@@ -23,6 +23,22 @@ const GROUP_A = new Set([
 
 // Group B: confirmed
 const GROUP_B = new Set(["OrderConfirmed"]);
+
+// Steadfast-controlled statuses: cannot be manually changed from our website.
+// Only Steadfast updates these via webhook/sync. InReview is excluded because
+// that's the status we submit to Steadfast ourselves.
+const STEADFAST_LOCKED_STATUSES = new Set([
+  "Pending",
+  "Delivered",
+  "PartlyDelivered",
+  "Cancel",
+  "CourierHold",
+  "DeliveredApprovalPending",
+  "PartialDeliveredApprovalPending",
+  "CancelledApprovalPending",
+  "UnknownApprovalPending",
+  "CourierUnknown",
+]);
 
 // Group C: final/delivery statuses
 const GROUP_C = new Set([
@@ -316,6 +332,20 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 
     const from = existing.status as string;
 
+    // Block: manually changing a Steadfast-controlled status is not allowed.
+    if (STEADFAST_LOCKED_STATUSES.has(from)) {
+      return res.status(403).json({
+        message: `Order is in "${from}" status which is controlled by Steadfast. Manual status change is not allowed.`,
+      });
+    }
+
+    // Block: cannot set status to a Steadfast-locked status manually.
+    if (STEADFAST_LOCKED_STATUSES.has(status)) {
+      return res.status(403).json({
+        message: `Cannot manually set status to "${status}". This status is controlled by Steadfast.`,
+      });
+    }
+
     // Block: Group A → Group C directly (must go through OrderConfirmed first)
     if (GROUP_A.has(from) && GROUP_C.has(status)) {
       return res.status(400).json({
@@ -365,47 +395,18 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       include: { items: true },
     });
 
-    // Auto-create SteadFast consignment on InReview (only once)
-    if (status === "InReview" && !(order.courier as any)?.consignment_id) {
+    // Submit to SteadFast on first InReview transition (idempotent)
+    if (status === "InReview") {
       try {
-        const invoice = `ORD-${id}`;
-        const consignment = await createConsignment({
-          invoice,
-          recipient_name: order.customerName,
-          recipient_phone: order.customerPhone,
-          recipient_address: order.address,
-          cod_amount: order.total,
-          note: order.note ?? undefined,
-        });
-        const courierData = {
-          provider: "steadfast",
-          consignment_id: consignment.consignment_id,
-          tracking_code: consignment.tracking_code,
-          invoice: consignment.invoice,
-          status: consignment.status,
-          cod_amount: consignment.cod_amount,
-          delivery_charge: null,
-          last_update: new Date().toISOString(),
-        };
-        order = await prisma.order.update({
+        await submitOrderToCourier(id, "steadfast");
+        // Re-fetch to get updated courier JSON
+        order = await prisma.order.findUniqueOrThrow({
           where: { id },
-          data: { courier: courierData },
           include: { items: true },
         });
-        console.log(
-          `[Courier] ✅ Order #${id} submitted to SteadFast successfully.\n`,
-          `  consignment_id : ${consignment.consignment_id}\n`,
-          `  tracking_code  : ${consignment.tracking_code}\n`,
-          `  invoice        : ${consignment.invoice}\n`,
-          `  status         : ${consignment.status}\n`,
-          `  cod_amount     : ${consignment.cod_amount}`
-        );
       } catch (courierErr: any) {
-        console.error(
-          `[Courier] Failed to create consignment for order #${id}:`,
-          courierErr.message
-        );
-        // Non-fatal: order status is already updated; log and continue
+        console.error(`[Courier] Failed to submit order #${id} to SteadFast:`, courierErr.message);
+        // Non-fatal: status already updated, courier can be retried via /courier/dispatch/:id
       }
     }
 
@@ -445,11 +446,32 @@ export const updateOrder = async (req: Request, res: Response) => {
     if (address) data.address = address;
     if (contactLink !== undefined) data.contactLink = contactLink || null;
     if (note !== undefined) data.note = note || null;
-    if (status) data.status = status;
+    if (status) {
+      // Block: cannot manually change to or from a Steadfast-locked status
+      const currentOrder = await prisma.order.findUnique({ where: { id }, select: { status: true } });
+      if (currentOrder && STEADFAST_LOCKED_STATUSES.has(currentOrder.status)) {
+        return res.status(403).json({
+          message: `Order is in "${currentOrder.status}" status which is controlled by Steadfast. Manual status change is not allowed.`,
+        });
+      }
+      if (STEADFAST_LOCKED_STATUSES.has(status)) {
+        return res.status(403).json({
+          message: `Cannot manually set status to "${status}". This status is controlled by Steadfast.`,
+        });
+      }
+      data.status = status;
+    }
 
     // Replace items if provided
     if (Array.isArray(items)) {
-      // Resolve all variants in one query
+      // Fetch current order with items and stockDeducted flag
+      const currentOrderFull = await prisma.order.findUnique({
+        where: { id },
+        include: { items: true },
+      });
+      if (!currentOrderFull) return res.status(404).json({ message: "Order not found" });
+
+      // Build variant map for new items
       let subtotal = 0;
       const resolved: {
         variantId: number;
@@ -472,9 +494,7 @@ export const updateOrder = async (req: Request, res: Response) => {
         const isFree = !!item.isFreeItem;
         const variant = variantMap[Number(item.variantId)];
         if (!variant)
-          return res
-            .status(400)
-            .json({ message: `Variant ${item.variantId} not found` });
+          return res.status(400).json({ message: `Variant ${item.variantId} not found` });
         const qty = Number(item.quantity) || 1;
         const price = isFree ? 0 : variant.salePrice;
         subtotal += price * qty;
@@ -484,15 +504,60 @@ export const updateOrder = async (req: Request, res: Response) => {
           sku: variant.sku ?? null,
           price,
           quantity: qty,
-          sealText:
-            variant.product.type === "seal" ? item.sealText || null : null,
+          sealText: variant.product.type === "seal" ? item.sealText || null : null,
           isFreeItem: isFree,
         });
       }
+
       // Delete old items and create new ones
       await prisma.orderItem.deleteMany({ where: { orderId: id } });
       data.subtotal = subtotal;
       data.items = { create: resolved };
+
+      // If stock has already been deducted for this order, reconcile the difference
+      if (currentOrderFull.stockDeducted) {
+        // Build maps: variantId → total quantity
+        const oldQtyMap = new Map<number, number>();
+        for (const oi of currentOrderFull.items) {
+          if (!oi.isFreeItem) {
+            oldQtyMap.set(oi.variantId, (oldQtyMap.get(oi.variantId) ?? 0) + oi.quantity);
+          }
+        }
+        const newQtyMap = new Map<number, number>();
+        for (const r of resolved) {
+          if (!r.isFreeItem) {
+            newQtyMap.set(r.variantId, (newQtyMap.get(r.variantId) ?? 0) + r.quantity);
+          }
+        }
+
+        // Collect all variant ids from both old and new
+        const allVariantIds = new Set([...oldQtyMap.keys(), ...newQtyMap.keys()]);
+        const productIds = new Set<number>();
+
+        await prisma.$transaction(async (tx) => {
+          for (const vid of allVariantIds) {
+            const oldQty = oldQtyMap.get(vid) ?? 0;
+            const newQty = newQtyMap.get(vid) ?? 0;
+            const diff = newQty - oldQty;
+            if (diff === 0) continue;
+
+            const variant = await tx.productVariant.findUnique({ where: { id: vid }, select: { productId: true } });
+            if (!variant) continue;
+            productIds.add(variant.productId);
+
+            if (diff > 0) {
+              // More items → deduct additional stock
+              await adjustStock(vid, "SALE", diff, `Order #${id} items updated — extra deduction`, tx as any);
+            } else {
+              // Fewer items → return stock
+              await adjustStock(vid, "RETURN", Math.abs(diff), `Order #${id} items updated — partial return`, tx as any);
+            }
+          }
+          for (const pid of productIds) await syncProductStock(pid, tx as any);
+        });
+
+        if (allVariantIds.size > 0) io.emit("inventory:updated", {});
+      }
     }
 
     const existing = await prisma.order.findUnique({
@@ -539,11 +604,17 @@ export const addOrderItem = async (req: Request, res: Response) => {
     });
     if (!variant) return res.status(400).json({ message: "Variant not found" });
 
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { stockDeducted: true },
+    });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
     const qty = Number(quantity) || 1;
     const isSeal = variant.product.type === "seal";
 
-    const [item] = await prisma.$transaction([
-      prisma.orderItem.create({
+    await prisma.$transaction(async (tx) => {
+      await tx.orderItem.create({
         data: {
           orderId,
           variantId: variant.id,
@@ -553,16 +624,30 @@ export const addOrderItem = async (req: Request, res: Response) => {
           quantity: qty,
           sealText: isSeal ? sealText || null : null,
         },
-      }),
-      prisma.order.update({
+      });
+      await tx.order.update({
         where: { id: orderId },
         data: {
           subtotal: { increment: variant.salePrice * qty },
           total: { increment: variant.salePrice * qty },
         },
-      }),
-    ]);
+      });
+      // If stock was already deducted for this order, deduct for the new item too
+      if (order.stockDeducted) {
+        await adjustStock(
+          variant.id, "SALE", qty,
+          `Order #${orderId} item added after stock deduction`, tx as any
+        );
+        await syncProductStock(variant.product.id, tx as any);
+      }
+    });
 
+    const item = await prisma.orderItem.findFirst({
+      where: { orderId, variantId: variant.id },
+      orderBy: { id: "desc" },
+    });
+
+    if (order.stockDeducted) io.emit("inventory:updated", {});
     return res.json({ item });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -575,15 +660,36 @@ export const removeOrderItem = async (req: Request, res: Response) => {
     const item = await prisma.orderItem.findUnique({ where: { id: itemId } });
     if (!item) return res.status(404).json({ message: "Item not found" });
 
+    const order = await prisma.order.findUnique({
+      where: { id: item.orderId },
+      select: { stockDeducted: true },
+    });
+
     const deduct = item.price * item.quantity;
-    await prisma.$transaction([
-      prisma.orderItem.delete({ where: { id: itemId } }),
-      prisma.order.update({
+
+    await prisma.$transaction(async (tx) => {
+      await tx.orderItem.delete({ where: { id: itemId } });
+      await tx.order.update({
         where: { id: item.orderId },
         data: { subtotal: { decrement: deduct }, total: { decrement: deduct } },
-      }),
-    ]);
+      });
+      // Return stock if it was already deducted
+      if (order?.stockDeducted && !item.isFreeItem) {
+        const variant = await tx.productVariant.findUnique({
+          where: { id: item.variantId },
+          select: { productId: true },
+        });
+        if (variant) {
+          await adjustStock(
+            item.variantId, "RETURN", item.quantity,
+            `Order #${item.orderId} item removed — stock restored`, tx as any
+          );
+          await syncProductStock(variant.productId, tx as any);
+        }
+      }
+    });
 
+    if (order?.stockDeducted && !item.isFreeItem) io.emit("inventory:updated", {});
     return res.json({ message: "Item removed" });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -598,23 +704,53 @@ export const updateOrderItemQuantity = async (req: Request, res: Response) => {
     if (!qty || qty < 1)
       return res.status(400).json({ message: "Invalid quantity" });
 
-    const existing = await prisma.orderItem.findUnique({
-      where: { id: itemId },
-    });
+    const existing = await prisma.orderItem.findUnique({ where: { id: itemId } });
     if (!existing) return res.status(404).json({ message: "Item not found" });
 
-    const diff = (qty - existing.quantity) * existing.price;
-    const [item] = await prisma.$transaction([
-      prisma.orderItem.update({
-        where: { id: itemId },
-        data: { quantity: qty },
-      }),
-      prisma.order.update({
-        where: { id: existing.orderId },
-        data: { subtotal: { increment: diff }, total: { increment: diff } },
-      }),
-    ]);
+    const order = await prisma.order.findUnique({
+      where: { id: existing.orderId },
+      select: { stockDeducted: true },
+    });
 
+    const priceDiff = (qty - existing.quantity) * existing.price;
+    const qtyDiff = qty - existing.quantity; // positive = more, negative = fewer
+
+    await prisma.$transaction(async (tx) => {
+      await tx.orderItem.update({ where: { id: itemId }, data: { quantity: qty } });
+      await tx.order.update({
+        where: { id: existing.orderId },
+        data: { subtotal: { increment: priceDiff }, total: { increment: priceDiff } },
+      });
+
+      // Adjust physical stock for the quantity difference if already deducted
+      if (order?.stockDeducted && !existing.isFreeItem && qtyDiff !== 0) {
+        const variant = await tx.productVariant.findUnique({
+          where: { id: existing.variantId },
+          select: { productId: true },
+        });
+        if (variant) {
+          if (qtyDiff > 0) {
+            // Added more items → deduct additional stock
+            await adjustStock(
+              existing.variantId, "SALE", qtyDiff,
+              `Order #${existing.orderId} qty increased by ${qtyDiff}`, tx as any
+            );
+          } else {
+            // Removed some items → return stock
+            await adjustStock(
+              existing.variantId, "RETURN", Math.abs(qtyDiff),
+              `Order #${existing.orderId} qty decreased by ${Math.abs(qtyDiff)}`, tx as any
+            );
+          }
+          await syncProductStock(variant.productId, tx as any);
+        }
+      }
+    });
+
+    const item = await prisma.orderItem.findUnique({ where: { id: itemId } });
+    if (order?.stockDeducted && !existing.isFreeItem && qtyDiff !== 0) {
+      io.emit("inventory:updated", {});
+    }
     return res.json({ item });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -683,11 +819,38 @@ export const updateOrderItemSealText = async (req: Request, res: Response) => {
 
 export const moveOrderToTrash = async (req: Request, res: Response) => {
   try {
-    await prisma.order.update({
-      where: { id: Number(req.params.id) },
-      data: { isTrashed: true },
+    const id = Number(req.params.id);
+    const existing = await prisma.order.findUnique({
+      where: { id },
+      include: { items: true },
     });
-    io.emit("order:trashed", { id: Number(req.params.id) });
+    if (!existing) return res.status(404).json({ message: "Order not found" });
+
+    // Restore stock if it was deducted before trashing
+    if (existing.stockDeducted) {
+      await prisma.$transaction(async (tx) => {
+        const productIds = new Set<number>();
+        for (const item of existing.items) {
+          const variant = await tx.productVariant.findUnique({
+            where: { id: item.variantId },
+            select: { productId: true },
+          });
+          if (!variant) continue;
+          await adjustStock(
+            item.variantId, "RETURN", item.quantity,
+            `Order #${id} trashed — stock restored`, tx as any
+          );
+          productIds.add(variant.productId);
+        }
+        for (const pid of productIds) await syncProductStock(pid, tx as any);
+        await tx.order.update({ where: { id }, data: { isTrashed: true, stockDeducted: false } });
+      });
+    } else {
+      await prisma.order.update({ where: { id }, data: { isTrashed: true } });
+    }
+
+    io.emit("order:trashed", { id });
+    io.emit("inventory:updated", {});
     return res.json({ message: "Order moved to trash" });
   } catch {
     return res.status(500).json({ message: "Internal server error" });
@@ -724,10 +887,45 @@ export const bulkTrashOrders = async (req: Request, res: Response) => {
     if (!Array.isArray(ids) || ids.length === 0)
       return res.status(400).json({ message: "ids array is required" });
 
-    await prisma.order.updateMany({
-      where: { id: { in: ids } },
-      data: { isTrashed: true },
+    // Fetch orders that have stock deducted — need to restore their stock
+    const ordersWithStock = await prisma.order.findMany({
+      where: { id: { in: ids }, stockDeducted: true },
+      include: { items: true },
     });
+
+    if (ordersWithStock.length > 0) {
+      for (const order of ordersWithStock) {
+        await prisma.$transaction(async (tx) => {
+          const productIds = new Set<number>();
+          for (const item of order.items) {
+            if (item.isFreeItem) continue;
+            const variant = await tx.productVariant.findUnique({
+              where: { id: item.variantId },
+              select: { productId: true },
+            });
+            if (!variant) continue;
+            await adjustStock(
+              item.variantId, "RETURN", item.quantity,
+              `Order #${order.id} bulk-trashed — stock restored`, tx as any
+            );
+            productIds.add(variant.productId);
+          }
+          for (const pid of productIds) await syncProductStock(pid, tx as any);
+          await tx.order.update({ where: { id: order.id }, data: { stockDeducted: false } });
+        });
+      }
+      io.emit("inventory:updated", {});
+    }
+
+    // Simple orders (no stock deducted) — batch update
+    const simpleIds = ids.filter((id: number) => !ordersWithStock.find((o) => o.id === id));
+    if (simpleIds.length > 0) {
+      await prisma.order.updateMany({ where: { id: { in: simpleIds } }, data: { isTrashed: true } });
+    }
+    if (ordersWithStock.length > 0) {
+      await prisma.order.updateMany({ where: { id: { in: ordersWithStock.map((o) => o.id) } }, data: { isTrashed: true } });
+    }
+
     io.emit("order:trashed", { ids });
     return res.json({ message: `${ids.length} orders moved to trash` });
   } catch {
@@ -763,6 +961,13 @@ export const bulkUpdateOrderStatus = async (req: Request, res: Response) => {
     if (!VALID_STATUSES.includes(status))
       return res.status(400).json({ message: "Invalid status" });
 
+    // Block: cannot bulk-set to a Steadfast-locked status manually.
+    if (STEADFAST_LOCKED_STATUSES.has(status)) {
+      return res.status(403).json({
+        message: `Cannot manually set status to "${status}". This status is controlled by Steadfast.`,
+      });
+    }
+
     const errors: { id: number; message: string }[] = [];
     const numericIds = ids.map(Number);
 
@@ -783,6 +988,12 @@ export const bulkUpdateOrderStatus = async (req: Request, res: Response) => {
       if (!existing) { errors.push({ id, message: "Not found" }); continue; }
 
       const from = existing.status as string;
+
+      // Skip Steadfast-locked orders
+      if (STEADFAST_LOCKED_STATUSES.has(from)) {
+        errors.push({ id, message: `Status "${from}" is controlled by Steadfast. Manual change not allowed.` });
+        continue;
+      }
 
       if (GROUP_A.has(from) && GROUP_C.has(status)) {
         errors.push({ id, message: `Cannot go directly from ${from} to ${status}` });

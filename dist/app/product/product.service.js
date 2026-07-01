@@ -47,6 +47,7 @@ function syncProductStock(productId_1) {
 /**
  * Adjusts a variant's stock and writes a StockHistory record.
  * quantity is always a positive number; action determines direction.
+ * Throws if SALE/REMOVE would take stock below zero.
  */
 function adjustStock(variantId_1, action_1, quantity_1, note_1) {
     return __awaiter(this, arguments, void 0, function* (variantId, action, quantity, note, tx = prisma_1.default) {
@@ -55,8 +56,9 @@ function adjustStock(variantId_1, action_1, quantity_1, note_1) {
             : action === "SALE" || action === "REMOVE" ? -quantity
                 : quantity; // ADJUSTMENT: caller passes signed quantity directly
         const newStock = variant.stock + delta;
-        if (newStock < 0 && (action === "ADD" || action === "RETURN" || action === "ADJUSTMENT")) {
-            throw new Error(`Insufficient stock for variant ${variantId}`);
+        // Never allow stock to go negative for any action
+        if (newStock < 0) {
+            throw new Error(`Insufficient stock for variant ${variantId}: current=${variant.stock}, requested=${quantity}, action=${action}`);
         }
         yield tx.productVariant.update({
             where: { id: variantId },

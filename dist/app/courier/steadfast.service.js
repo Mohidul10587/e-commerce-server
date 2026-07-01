@@ -1,4 +1,11 @@
 "use strict";
+/**
+ * steadfast.service.ts
+ *
+ * Backward-compatibility re-export.
+ * New code should use steadfast.adapter.ts directly.
+ * This file is kept so any external imports still resolve.
+ */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -9,77 +16,35 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.STEADFAST_STATUS_MAP = exports.createBulkConsignments = exports.getStatusByTrackingCode = exports.getStatusByInvoice = exports.getStatusByConsignmentId = void 0;
 exports.createConsignment = createConsignment;
-exports.getStatusByConsignmentId = getStatusByConsignmentId;
-exports.getStatusByInvoice = getStatusByInvoice;
-exports.getStatusByTrackingCode = getStatusByTrackingCode;
-exports.createBulkConsignments = createBulkConsignments;
-const BASE_URL = "https://portal.packzy.com/api/v1";
-function headers() {
-    return {
-        "Api-Key": process.env.STEADFAST_API_KEY,
-        "Secret-Key": process.env.STEADFAST_SECRET_KEY,
-        "Content-Type": "application/json",
-    };
-}
-function safeFetch(url, options) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const res = yield fetch(url, options);
-        if (!res.ok) {
-            const body = yield res.text().catch(() => "");
-            throw new Error(`SteadFast API error ${res.status}: ${body}`);
-        }
-        return res.json();
-    });
-}
+var steadfast_adapter_1 = require("./steadfast.adapter");
+Object.defineProperty(exports, "getStatusByConsignmentId", { enumerable: true, get: function () { return steadfast_adapter_1.getStatusByConsignmentId; } });
+Object.defineProperty(exports, "getStatusByInvoice", { enumerable: true, get: function () { return steadfast_adapter_1.getStatusByInvoice; } });
+Object.defineProperty(exports, "getStatusByTrackingCode", { enumerable: true, get: function () { return steadfast_adapter_1.getStatusByTrackingCode; } });
+Object.defineProperty(exports, "createBulkConsignments", { enumerable: true, get: function () { return steadfast_adapter_1.createBulkConsignments; } });
+Object.defineProperty(exports, "STEADFAST_STATUS_MAP", { enumerable: true, get: function () { return steadfast_adapter_1.STEADFAST_STATUS_MAP; } });
+// Legacy createConsignment export — wraps the new adapter
+const steadfast_adapter_2 = require("./steadfast.adapter");
+const _adapter = new steadfast_adapter_2.SteadFastAdapter();
 function createConsignment(payload) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a;
-        const data = yield safeFetch(`${BASE_URL}/create_order`, {
-            method: "POST",
-            headers: headers(),
-            body: JSON.stringify(payload),
-        });
-        const c = (_a = data.consignment) !== null && _a !== void 0 ? _a : data;
-        return {
-            consignment_id: c.consignment_id,
-            tracking_code: c.tracking_code,
-            invoice: c.invoice,
-            status: c.status,
-            cod_amount: c.cod_amount,
+        var _a, _b;
+        const input = {
+            invoice: payload.invoice,
+            recipientName: payload.recipient_name,
+            recipientPhone: payload.recipient_phone,
+            recipientAddress: payload.recipient_address,
+            codAmount: payload.cod_amount,
+            note: payload.note,
         };
-    });
-}
-function getStatusByConsignmentId(consignment_id) {
-    return __awaiter(this, void 0, void 0, function* () {
-        return safeFetch(`${BASE_URL}/status_by_cid/${consignment_id}`, {
-            method: "GET",
-            headers: headers(),
-        });
-    });
-}
-function getStatusByInvoice(invoice) {
-    return __awaiter(this, void 0, void 0, function* () {
-        return safeFetch(`${BASE_URL}/status_by_invoice/${invoice}`, {
-            method: "GET",
-            headers: headers(),
-        });
-    });
-}
-function getStatusByTrackingCode(trackingCode) {
-    return __awaiter(this, void 0, void 0, function* () {
-        return safeFetch(`${BASE_URL}/status_by_trackingcode/${trackingCode}`, {
-            method: "GET",
-            headers: headers(),
-        });
-    });
-}
-function createBulkConsignments(orders) {
-    return __awaiter(this, void 0, void 0, function* () {
-        return safeFetch(`${BASE_URL}/create_order/bulk-order`, {
-            method: "POST",
-            headers: headers(),
-            body: JSON.stringify({ data: orders }),
-        });
+        const result = yield _adapter.createShipment(input);
+        return {
+            consignment_id: Number(result.consignmentId),
+            tracking_code: (_a = result.trackingCode) !== null && _a !== void 0 ? _a : "",
+            invoice: (_b = result.invoice) !== null && _b !== void 0 ? _b : payload.invoice,
+            status: result.courierStatus,
+            cod_amount: result.codAmount,
+        };
     });
 }

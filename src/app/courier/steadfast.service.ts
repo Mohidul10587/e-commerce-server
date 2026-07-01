@@ -1,12 +1,22 @@
-const BASE_URL = "https://portal.packzy.com/api/v1";
+/**
+ * steadfast.service.ts
+ *
+ * Backward-compatibility re-export.
+ * New code should use steadfast.adapter.ts directly.
+ * This file is kept so any external imports still resolve.
+ */
 
-function headers() {
-  return {
-    "Api-Key": process.env.STEADFAST_API_KEY!,
-    "Secret-Key": process.env.STEADFAST_SECRET_KEY!,
-    "Content-Type": "application/json",
-  };
-}
+export {
+  getStatusByConsignmentId,
+  getStatusByInvoice,
+  getStatusByTrackingCode,
+  createBulkConsignments,
+  STEADFAST_STATUS_MAP,
+} from "./steadfast.adapter";
+
+// Legacy createConsignment export — wraps the new adapter
+import { SteadFastAdapter } from "./steadfast.adapter";
+import type { CreateShipmentInput } from "./courier.types";
 
 export interface CreateOrderPayload {
   invoice: string;
@@ -25,56 +35,23 @@ export interface CourierConsignment {
   cod_amount: number;
 }
 
-async function safeFetch(url: string, options: RequestInit): Promise<any> {
-  const res = await fetch(url, options);
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`SteadFast API error ${res.status}: ${body}`);
-  }
-  return res.json();
-}
+const _adapter = new SteadFastAdapter();
 
 export async function createConsignment(payload: CreateOrderPayload): Promise<CourierConsignment> {
-  const data = await safeFetch(`${BASE_URL}/create_order`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(payload),
-  });
-  const c = data.consignment ?? data;
-  return {
-    consignment_id: c.consignment_id,
-    tracking_code: c.tracking_code,
-    invoice: c.invoice,
-    status: c.status,
-    cod_amount: c.cod_amount,
+  const input: CreateShipmentInput = {
+    invoice: payload.invoice,
+    recipientName: payload.recipient_name,
+    recipientPhone: payload.recipient_phone,
+    recipientAddress: payload.recipient_address,
+    codAmount: payload.cod_amount,
+    note: payload.note,
   };
-}
-
-export async function getStatusByConsignmentId(consignment_id: number | string) {
-  return safeFetch(`${BASE_URL}/status_by_cid/${consignment_id}`, {
-    method: "GET",
-    headers: headers(),
-  });
-}
-
-export async function getStatusByInvoice(invoice: string) {
-  return safeFetch(`${BASE_URL}/status_by_invoice/${invoice}`, {
-    method: "GET",
-    headers: headers(),
-  });
-}
-
-export async function getStatusByTrackingCode(trackingCode: string) {
-  return safeFetch(`${BASE_URL}/status_by_trackingcode/${trackingCode}`, {
-    method: "GET",
-    headers: headers(),
-  });
-}
-
-export async function createBulkConsignments(orders: CreateOrderPayload[]) {
-  return safeFetch(`${BASE_URL}/create_order/bulk-order`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({ data: orders }),
-  });
+  const result = await _adapter.createShipment(input);
+  return {
+    consignment_id: Number(result.consignmentId),
+    tracking_code: result.trackingCode ?? "",
+    invoice: result.invoice ?? payload.invoice,
+    status: result.courierStatus,
+    cod_amount: result.codAmount,
+  };
 }

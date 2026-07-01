@@ -239,7 +239,8 @@ model Order {
   stockDeducted       Boolean       @default(false)
   note                String?
   contactLink         String?
-  courier             Json?
+  courier             Json?         // legacy field — kept for backward compatibility
+  shipment            CourierShipment?
   assignedDesignerId  Int?
   assignedDesigner    User?  @relation("DesignerOrders", fields: [assignedDesignerId], references: [id])
   transactions        PaymentTransaction[]
@@ -250,6 +251,49 @@ model Order {
   @@index([isTrashed, paymentStatus])
   @@index([assignedDesignerId])
   @@index([createdAt])
+}
+
+/// Supported courier providers
+enum CourierProvider {
+  steadfast
+  pathao
+  redx
+  paperfly
+}
+
+/// Courier shipment record — one per order, provider-agnostic
+model CourierShipment {
+  id              Int             @id @default(autoincrement())
+  orderId         Int             @unique
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider        CourierProvider
+  /// Provider-assigned shipment / consignment identifier
+  consignmentId   String
+  /// Human-readable tracking code shown to customer
+  trackingCode    String?
+  /// Invoice/reference number sent to provider
+  invoice         String?
+  /// Current status as reported by the courier provider
+  courierStatus   String
+  /// COD amount sent to provider
+  codAmount       Float
+  /// Delivery charge reported back by provider (may be null until confirmed)
+  deliveryCharge  Float?
+
+  /// Full raw API response from the provider (create call)
+  rawResponse     Json?
+  /// Last raw status payload received from provider (webhook/sync)
+  lastStatusPayload Json?
+
+  submittedAt     DateTime        @default(now())
+  lastSyncAt      DateTime        @default(now())
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([provider, consignmentId])
+  @@index([orderId])
 }
 
 model PaymentTransaction {

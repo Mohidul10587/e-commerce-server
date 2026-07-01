@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.designerSubmitDesign = exports.getOrderForDesigner = exports.getDesignerDashboardOrders = exports.bulkAssignDesigner = exports.assignDesigner = exports.emptyOrderTrash = exports.updateOrderPayment = exports.updateOrderPaymentTx = exports.deleteOrderPayment = exports.getOrderPayments = exports.updateOrderDiscount = exports.bulkUpdateOrderStatus = exports.bulkRestoreOrders = exports.bulkTrashOrders = exports.permanentDeleteOrder = exports.restoreOrder = exports.moveOrderToTrash = exports.updateOrderItemSealText = exports.updateOrderItemVariant = exports.updateOrderItemQuantity = exports.removeOrderItem = exports.addOrderItem = exports.updateOrder = exports.updateOrderStatus = exports.getOrderById = exports.getOrders = exports.createOrder = exports.getOrderStatusCounts = exports.getPublicStats = void 0;
 const prisma_1 = require("../../lib/prisma");
 const index_1 = require("../../index");
-const steadfast_service_1 = require("../courier/steadfast.service");
+const courier_dispatch_1 = require("../courier/courier.dispatch");
 const whatsapp_service_1 = require("../../lib/whatsapp.service");
 const product_service_1 = require("../product/product.service");
 // Group A: preliminary statuses
@@ -32,6 +32,21 @@ const GROUP_A = new Set([
 ]);
 // Group B: confirmed
 const GROUP_B = new Set(["OrderConfirmed"]);
+// Steadfast-controlled statuses: cannot be manually changed from our website.
+// Only Steadfast updates these via webhook/sync. InReview is excluded because
+// that's the status we submit to Steadfast ourselves.
+const STEADFAST_LOCKED_STATUSES = new Set([
+    "Pending",
+    "Delivered",
+    "PartlyDelivered",
+    "Cancel",
+    "CourierHold",
+    "DeliveredApprovalPending",
+    "PartialDeliveredApprovalPending",
+    "CancelledApprovalPending",
+    "UnknownApprovalPending",
+    "CourierUnknown",
+]);
 // Group C: final/delivery statuses
 const GROUP_C = new Set([
     "InReview",
@@ -277,7 +292,6 @@ const getOrderById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.getOrderById = getOrderById;
 const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
     try {
         const { status } = req.body;
         const id = Number(req.params.id);
@@ -289,6 +303,18 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
             include: { items: true },
         });
         const from = existing.status;
+        // Block: manually changing a Steadfast-controlled status is not allowed.
+        if (STEADFAST_LOCKED_STATUSES.has(from)) {
+            return res.status(403).json({
+                message: `Order is in "${from}" status which is controlled by Steadfast. Manual status change is not allowed.`,
+            });
+        }
+        // Block: cannot set status to a Steadfast-locked status manually.
+        if (STEADFAST_LOCKED_STATUSES.has(status)) {
+            return res.status(403).json({
+                message: `Cannot manually set status to "${status}". This status is controlled by Steadfast.`,
+            });
+        }
         // Block: Group A → Group C directly (must go through OrderConfirmed first)
         if (GROUP_A.has(from) && GROUP_C.has(status)) {
             return res.status(400).json({
@@ -336,38 +362,19 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
             where: { id },
             include: { items: true },
         });
-        // Auto-create SteadFast consignment on InReview (only once)
-        if (status === "InReview" && !((_a = order.courier) === null || _a === void 0 ? void 0 : _a.consignment_id)) {
+        // Submit to SteadFast on first InReview transition (idempotent)
+        if (status === "InReview") {
             try {
-                const invoice = `ORD-${id}`;
-                const consignment = yield (0, steadfast_service_1.createConsignment)({
-                    invoice,
-                    recipient_name: order.customerName,
-                    recipient_phone: order.customerPhone,
-                    recipient_address: order.address,
-                    cod_amount: order.total,
-                    note: (_b = order.note) !== null && _b !== void 0 ? _b : undefined,
-                });
-                const courierData = {
-                    provider: "steadfast",
-                    consignment_id: consignment.consignment_id,
-                    tracking_code: consignment.tracking_code,
-                    invoice: consignment.invoice,
-                    status: consignment.status,
-                    cod_amount: consignment.cod_amount,
-                    delivery_charge: null,
-                    last_update: new Date().toISOString(),
-                };
-                order = yield prisma_1.prisma.order.update({
+                yield (0, courier_dispatch_1.submitOrderToCourier)(id, "steadfast");
+                // Re-fetch to get updated courier JSON
+                order = yield prisma_1.prisma.order.findUniqueOrThrow({
                     where: { id },
-                    data: { courier: courierData },
                     include: { items: true },
                 });
-                console.log(`[Courier] ✅ Order #${id} submitted to SteadFast successfully.\n`, `  consignment_id : ${consignment.consignment_id}\n`, `  tracking_code  : ${consignment.tracking_code}\n`, `  invoice        : ${consignment.invoice}\n`, `  status         : ${consignment.status}\n`, `  cod_amount     : ${consignment.cod_amount}`);
             }
             catch (courierErr) {
-                console.error(`[Courier] Failed to create consignment for order #${id}:`, courierErr.message);
-                // Non-fatal: order status is already updated; log and continue
+                console.error(`[Courier] Failed to submit order #${id} to SteadFast:`, courierErr.message);
+                // Non-fatal: status already updated, courier can be retried via /courier/dispatch/:id
             }
         }
         index_1.io.emit("order:updated", order);
@@ -377,13 +384,13 @@ const updateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
         }
         return res.json({ order });
     }
-    catch (_c) {
+    catch (_a) {
         return res.status(500).json({ message: "Internal server error" });
     }
 });
 exports.updateOrderStatus = updateOrderStatus;
 const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c, _d;
     try {
         const id = Number(req.params.id);
         const { customerName, customerPhone, alternativePhone, address, contactLink, status, discount, discountPercent, paidAmount, items, note, } = req.body;
@@ -400,11 +407,31 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             data.contactLink = contactLink || null;
         if (note !== undefined)
             data.note = note || null;
-        if (status)
+        if (status) {
+            // Block: cannot manually change to or from a Steadfast-locked status
+            const currentOrder = yield prisma_1.prisma.order.findUnique({ where: { id }, select: { status: true } });
+            if (currentOrder && STEADFAST_LOCKED_STATUSES.has(currentOrder.status)) {
+                return res.status(403).json({
+                    message: `Order is in "${currentOrder.status}" status which is controlled by Steadfast. Manual status change is not allowed.`,
+                });
+            }
+            if (STEADFAST_LOCKED_STATUSES.has(status)) {
+                return res.status(403).json({
+                    message: `Cannot manually set status to "${status}". This status is controlled by Steadfast.`,
+                });
+            }
             data.status = status;
+        }
         // Replace items if provided
         if (Array.isArray(items)) {
-            // Resolve all variants in one query
+            // Fetch current order with items and stockDeducted flag
+            const currentOrderFull = yield prisma_1.prisma.order.findUnique({
+                where: { id },
+                include: { items: true },
+            });
+            if (!currentOrderFull)
+                return res.status(404).json({ message: "Order not found" });
+            // Build variant map for new items
             let subtotal = 0;
             const resolved = [];
             const variantIds = items.map((i) => Number(i.variantId));
@@ -417,9 +444,7 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 const isFree = !!item.isFreeItem;
                 const variant = variantMap[Number(item.variantId)];
                 if (!variant)
-                    return res
-                        .status(400)
-                        .json({ message: `Variant ${item.variantId} not found` });
+                    return res.status(400).json({ message: `Variant ${item.variantId} not found` });
                 const qty = Number(item.quantity) || 1;
                 const price = isFree ? 0 : variant.salePrice;
                 subtotal += price * qty;
@@ -437,6 +462,51 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             yield prisma_1.prisma.orderItem.deleteMany({ where: { orderId: id } });
             data.subtotal = subtotal;
             data.items = { create: resolved };
+            // If stock has already been deducted for this order, reconcile the difference
+            if (currentOrderFull.stockDeducted) {
+                // Build maps: variantId → total quantity
+                const oldQtyMap = new Map();
+                for (const oi of currentOrderFull.items) {
+                    if (!oi.isFreeItem) {
+                        oldQtyMap.set(oi.variantId, ((_b = oldQtyMap.get(oi.variantId)) !== null && _b !== void 0 ? _b : 0) + oi.quantity);
+                    }
+                }
+                const newQtyMap = new Map();
+                for (const r of resolved) {
+                    if (!r.isFreeItem) {
+                        newQtyMap.set(r.variantId, ((_c = newQtyMap.get(r.variantId)) !== null && _c !== void 0 ? _c : 0) + r.quantity);
+                    }
+                }
+                // Collect all variant ids from both old and new
+                const allVariantIds = new Set([...oldQtyMap.keys(), ...newQtyMap.keys()]);
+                const productIds = new Set();
+                yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+                    var _a, _b;
+                    for (const vid of allVariantIds) {
+                        const oldQty = (_a = oldQtyMap.get(vid)) !== null && _a !== void 0 ? _a : 0;
+                        const newQty = (_b = newQtyMap.get(vid)) !== null && _b !== void 0 ? _b : 0;
+                        const diff = newQty - oldQty;
+                        if (diff === 0)
+                            continue;
+                        const variant = yield tx.productVariant.findUnique({ where: { id: vid }, select: { productId: true } });
+                        if (!variant)
+                            continue;
+                        productIds.add(variant.productId);
+                        if (diff > 0) {
+                            // More items → deduct additional stock
+                            yield (0, product_service_1.adjustStock)(vid, "SALE", diff, `Order #${id} items updated — extra deduction`, tx);
+                        }
+                        else {
+                            // Fewer items → return stock
+                            yield (0, product_service_1.adjustStock)(vid, "RETURN", Math.abs(diff), `Order #${id} items updated — partial return`, tx);
+                        }
+                    }
+                    for (const pid of productIds)
+                        yield (0, product_service_1.syncProductStock)(pid, tx);
+                }));
+                if (allVariantIds.size > 0)
+                    index_1.io.emit("inventory:updated", {});
+            }
         }
         const existing = yield prisma_1.prisma.order.findUnique({
             where: { id },
@@ -444,7 +514,7 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         });
         if (!existing)
             return res.status(404).json({ message: "Order not found" });
-        const subtotal = (_b = data.subtotal) !== null && _b !== void 0 ? _b : existing.subtotal;
+        const subtotal = (_d = data.subtotal) !== null && _d !== void 0 ? _d : existing.subtotal;
         const deliveryCharge = existing.deliveryCharge;
         const disc = discount !== undefined &&
             !isNaN(Number(discount)) &&
@@ -472,7 +542,6 @@ const updateOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 });
 exports.updateOrder = updateOrder;
 const addOrderItem = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
         const orderId = Number(req.params.id);
         const { variantId, quantity, sealText } = req.body;
@@ -482,10 +551,17 @@ const addOrderItem = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         });
         if (!variant)
             return res.status(400).json({ message: "Variant not found" });
+        const order = yield prisma_1.prisma.order.findUnique({
+            where: { id: orderId },
+            select: { stockDeducted: true },
+        });
+        if (!order)
+            return res.status(404).json({ message: "Order not found" });
         const qty = Number(quantity) || 1;
         const isSeal = variant.product.type === "seal";
-        const [item] = yield prisma_1.prisma.$transaction([
-            prisma_1.prisma.orderItem.create({
+        yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a;
+            yield tx.orderItem.create({
                 data: {
                     orderId,
                     variantId: variant.id,
@@ -495,18 +571,29 @@ const addOrderItem = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                     quantity: qty,
                     sealText: isSeal ? sealText || null : null,
                 },
-            }),
-            prisma_1.prisma.order.update({
+            });
+            yield tx.order.update({
                 where: { id: orderId },
                 data: {
                     subtotal: { increment: variant.salePrice * qty },
                     total: { increment: variant.salePrice * qty },
                 },
-            }),
-        ]);
+            });
+            // If stock was already deducted for this order, deduct for the new item too
+            if (order.stockDeducted) {
+                yield (0, product_service_1.adjustStock)(variant.id, "SALE", qty, `Order #${orderId} item added after stock deduction`, tx);
+                yield (0, product_service_1.syncProductStock)(variant.product.id, tx);
+            }
+        }));
+        const item = yield prisma_1.prisma.orderItem.findFirst({
+            where: { orderId, variantId: variant.id },
+            orderBy: { id: "desc" },
+        });
+        if (order.stockDeducted)
+            index_1.io.emit("inventory:updated", {});
         return res.json({ item });
     }
-    catch (_b) {
+    catch (_a) {
         return res.status(500).json({ message: "Internal server error" });
     }
 });
@@ -517,14 +604,31 @@ const removeOrderItem = (req, res) => __awaiter(void 0, void 0, void 0, function
         const item = yield prisma_1.prisma.orderItem.findUnique({ where: { id: itemId } });
         if (!item)
             return res.status(404).json({ message: "Item not found" });
+        const order = yield prisma_1.prisma.order.findUnique({
+            where: { id: item.orderId },
+            select: { stockDeducted: true },
+        });
         const deduct = item.price * item.quantity;
-        yield prisma_1.prisma.$transaction([
-            prisma_1.prisma.orderItem.delete({ where: { id: itemId } }),
-            prisma_1.prisma.order.update({
+        yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            yield tx.orderItem.delete({ where: { id: itemId } });
+            yield tx.order.update({
                 where: { id: item.orderId },
                 data: { subtotal: { decrement: deduct }, total: { decrement: deduct } },
-            }),
-        ]);
+            });
+            // Return stock if it was already deducted
+            if ((order === null || order === void 0 ? void 0 : order.stockDeducted) && !item.isFreeItem) {
+                const variant = yield tx.productVariant.findUnique({
+                    where: { id: item.variantId },
+                    select: { productId: true },
+                });
+                if (variant) {
+                    yield (0, product_service_1.adjustStock)(item.variantId, "RETURN", item.quantity, `Order #${item.orderId} item removed — stock restored`, tx);
+                    yield (0, product_service_1.syncProductStock)(variant.productId, tx);
+                }
+            }
+        }));
+        if ((order === null || order === void 0 ? void 0 : order.stockDeducted) && !item.isFreeItem)
+            index_1.io.emit("inventory:updated", {});
         return res.json({ message: "Item removed" });
     }
     catch (_a) {
@@ -539,22 +643,44 @@ const updateOrderItemQuantity = (req, res) => __awaiter(void 0, void 0, void 0, 
         const qty = Number(quantity);
         if (!qty || qty < 1)
             return res.status(400).json({ message: "Invalid quantity" });
-        const existing = yield prisma_1.prisma.orderItem.findUnique({
-            where: { id: itemId },
-        });
+        const existing = yield prisma_1.prisma.orderItem.findUnique({ where: { id: itemId } });
         if (!existing)
             return res.status(404).json({ message: "Item not found" });
-        const diff = (qty - existing.quantity) * existing.price;
-        const [item] = yield prisma_1.prisma.$transaction([
-            prisma_1.prisma.orderItem.update({
-                where: { id: itemId },
-                data: { quantity: qty },
-            }),
-            prisma_1.prisma.order.update({
+        const order = yield prisma_1.prisma.order.findUnique({
+            where: { id: existing.orderId },
+            select: { stockDeducted: true },
+        });
+        const priceDiff = (qty - existing.quantity) * existing.price;
+        const qtyDiff = qty - existing.quantity; // positive = more, negative = fewer
+        yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            yield tx.orderItem.update({ where: { id: itemId }, data: { quantity: qty } });
+            yield tx.order.update({
                 where: { id: existing.orderId },
-                data: { subtotal: { increment: diff }, total: { increment: diff } },
-            }),
-        ]);
+                data: { subtotal: { increment: priceDiff }, total: { increment: priceDiff } },
+            });
+            // Adjust physical stock for the quantity difference if already deducted
+            if ((order === null || order === void 0 ? void 0 : order.stockDeducted) && !existing.isFreeItem && qtyDiff !== 0) {
+                const variant = yield tx.productVariant.findUnique({
+                    where: { id: existing.variantId },
+                    select: { productId: true },
+                });
+                if (variant) {
+                    if (qtyDiff > 0) {
+                        // Added more items → deduct additional stock
+                        yield (0, product_service_1.adjustStock)(existing.variantId, "SALE", qtyDiff, `Order #${existing.orderId} qty increased by ${qtyDiff}`, tx);
+                    }
+                    else {
+                        // Removed some items → return stock
+                        yield (0, product_service_1.adjustStock)(existing.variantId, "RETURN", Math.abs(qtyDiff), `Order #${existing.orderId} qty decreased by ${Math.abs(qtyDiff)}`, tx);
+                    }
+                    yield (0, product_service_1.syncProductStock)(variant.productId, tx);
+                }
+            }
+        }));
+        const item = yield prisma_1.prisma.orderItem.findUnique({ where: { id: itemId } });
+        if ((order === null || order === void 0 ? void 0 : order.stockDeducted) && !existing.isFreeItem && qtyDiff !== 0) {
+            index_1.io.emit("inventory:updated", {});
+        }
         return res.json({ item });
     }
     catch (_a) {
@@ -623,11 +749,37 @@ const updateOrderItemSealText = (req, res) => __awaiter(void 0, void 0, void 0, 
 exports.updateOrderItemSealText = updateOrderItemSealText;
 const moveOrderToTrash = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield prisma_1.prisma.order.update({
-            where: { id: Number(req.params.id) },
-            data: { isTrashed: true },
+        const id = Number(req.params.id);
+        const existing = yield prisma_1.prisma.order.findUnique({
+            where: { id },
+            include: { items: true },
         });
-        index_1.io.emit("order:trashed", { id: Number(req.params.id) });
+        if (!existing)
+            return res.status(404).json({ message: "Order not found" });
+        // Restore stock if it was deducted before trashing
+        if (existing.stockDeducted) {
+            yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+                const productIds = new Set();
+                for (const item of existing.items) {
+                    const variant = yield tx.productVariant.findUnique({
+                        where: { id: item.variantId },
+                        select: { productId: true },
+                    });
+                    if (!variant)
+                        continue;
+                    yield (0, product_service_1.adjustStock)(item.variantId, "RETURN", item.quantity, `Order #${id} trashed — stock restored`, tx);
+                    productIds.add(variant.productId);
+                }
+                for (const pid of productIds)
+                    yield (0, product_service_1.syncProductStock)(pid, tx);
+                yield tx.order.update({ where: { id }, data: { isTrashed: true, stockDeducted: false } });
+            }));
+        }
+        else {
+            yield prisma_1.prisma.order.update({ where: { id }, data: { isTrashed: true } });
+        }
+        index_1.io.emit("order:trashed", { id });
+        index_1.io.emit("inventory:updated", {});
         return res.json({ message: "Order moved to trash" });
     }
     catch (_a) {
@@ -666,10 +818,42 @@ const bulkTrashOrders = (req, res) => __awaiter(void 0, void 0, void 0, function
         const { ids } = req.body;
         if (!Array.isArray(ids) || ids.length === 0)
             return res.status(400).json({ message: "ids array is required" });
-        yield prisma_1.prisma.order.updateMany({
-            where: { id: { in: ids } },
-            data: { isTrashed: true },
+        // Fetch orders that have stock deducted — need to restore their stock
+        const ordersWithStock = yield prisma_1.prisma.order.findMany({
+            where: { id: { in: ids }, stockDeducted: true },
+            include: { items: true },
         });
+        if (ordersWithStock.length > 0) {
+            for (const order of ordersWithStock) {
+                yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+                    const productIds = new Set();
+                    for (const item of order.items) {
+                        if (item.isFreeItem)
+                            continue;
+                        const variant = yield tx.productVariant.findUnique({
+                            where: { id: item.variantId },
+                            select: { productId: true },
+                        });
+                        if (!variant)
+                            continue;
+                        yield (0, product_service_1.adjustStock)(item.variantId, "RETURN", item.quantity, `Order #${order.id} bulk-trashed — stock restored`, tx);
+                        productIds.add(variant.productId);
+                    }
+                    for (const pid of productIds)
+                        yield (0, product_service_1.syncProductStock)(pid, tx);
+                    yield tx.order.update({ where: { id: order.id }, data: { stockDeducted: false } });
+                }));
+            }
+            index_1.io.emit("inventory:updated", {});
+        }
+        // Simple orders (no stock deducted) — batch update
+        const simpleIds = ids.filter((id) => !ordersWithStock.find((o) => o.id === id));
+        if (simpleIds.length > 0) {
+            yield prisma_1.prisma.order.updateMany({ where: { id: { in: simpleIds } }, data: { isTrashed: true } });
+        }
+        if (ordersWithStock.length > 0) {
+            yield prisma_1.prisma.order.updateMany({ where: { id: { in: ordersWithStock.map((o) => o.id) } }, data: { isTrashed: true } });
+        }
         index_1.io.emit("order:trashed", { ids });
         return res.json({ message: `${ids.length} orders moved to trash` });
     }
@@ -704,6 +888,12 @@ const bulkUpdateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, fu
                 .json({ message: "ids array and status are required" });
         if (!VALID_STATUSES.includes(status))
             return res.status(400).json({ message: "Invalid status" });
+        // Block: cannot bulk-set to a Steadfast-locked status manually.
+        if (STEADFAST_LOCKED_STATUSES.has(status)) {
+            return res.status(403).json({
+                message: `Cannot manually set status to "${status}". This status is controlled by Steadfast.`,
+            });
+        }
         const errors = [];
         const numericIds = ids.map(Number);
         // Fetch all orders in one query
@@ -723,6 +913,11 @@ const bulkUpdateOrderStatus = (req, res) => __awaiter(void 0, void 0, void 0, fu
                 continue;
             }
             const from = existing.status;
+            // Skip Steadfast-locked orders
+            if (STEADFAST_LOCKED_STATUSES.has(from)) {
+                errors.push({ id, message: `Status "${from}" is controlled by Steadfast. Manual change not allowed.` });
+                continue;
+            }
             if (GROUP_A.has(from) && GROUP_C.has(status)) {
                 errors.push({ id, message: `Cannot go directly from ${from} to ${status}` });
                 continue;

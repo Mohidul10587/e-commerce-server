@@ -9,13 +9,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dispatchOrder = exports.trackByTrackingCode = exports.trackByInvoice = exports.trackByCid = void 0;
+exports.getShipment = exports.dispatchOrder = exports.trackByTrackingCode = exports.trackByInvoice = exports.trackByCid = void 0;
 const prisma_1 = require("../../lib/prisma");
-const steadfast_service_1 = require("./steadfast.service");
+const steadfast_adapter_1 = require("./steadfast.adapter");
+const courier_dispatch_1 = require("./courier.dispatch");
 const index_1 = require("../../index");
 const trackByCid = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const data = yield (0, steadfast_service_1.getStatusByConsignmentId)(req.params.id);
+        const data = yield (0, steadfast_adapter_1.getStatusByConsignmentId)(req.params.id);
         return res.json(data);
     }
     catch (err) {
@@ -26,7 +27,7 @@ const trackByCid = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
 exports.trackByCid = trackByCid;
 const trackByInvoice = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const data = yield (0, steadfast_service_1.getStatusByInvoice)(req.params.invoice);
+        const data = yield (0, steadfast_adapter_1.getStatusByInvoice)(req.params.invoice);
         return res.json(data);
     }
     catch (err) {
@@ -37,7 +38,7 @@ const trackByInvoice = (req, res) => __awaiter(void 0, void 0, void 0, function*
 exports.trackByInvoice = trackByInvoice;
 const trackByTrackingCode = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const data = yield (0, steadfast_service_1.getStatusByTrackingCode)(req.params.trackingCode);
+        const data = yield (0, steadfast_adapter_1.getStatusByTrackingCode)(req.params.trackingCode);
         return res.json(data);
     }
     catch (err) {
@@ -46,44 +47,25 @@ const trackByTrackingCode = (req, res) => __awaiter(void 0, void 0, void 0, func
     }
 });
 exports.trackByTrackingCode = trackByTrackingCode;
-// Manually trigger courier consignment creation for an order
+/**
+ * Manually trigger courier dispatch for an order.
+ * Useful if the automatic InReview dispatch failed (network error etc.).
+ * Idempotent — safe to call multiple times.
+ */
 const dispatchOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
         const orderId = Number(req.params.id);
         const order = yield prisma_1.prisma.order.findUnique({ where: { id: orderId } });
         if (!order)
             return res.status(404).json({ message: "Order not found" });
-        const courier = order.courier;
-        if (courier === null || courier === void 0 ? void 0 : courier.consignment_id) {
-            return res.status(409).json({ message: "Consignment already created", courier });
-        }
-        const invoice = `ORD-${orderId}`;
-        const consignment = yield (0, steadfast_service_1.createConsignment)({
-            invoice,
-            recipient_name: order.customerName,
-            recipient_phone: order.customerPhone,
-            recipient_address: order.address,
-            cod_amount: order.total,
-            note: (_a = order.note) !== null && _a !== void 0 ? _a : undefined,
-        });
-        const courierData = {
-            provider: "steadfast",
-            consignment_id: consignment.consignment_id,
-            tracking_code: consignment.tracking_code,
-            invoice: consignment.invoice,
-            status: consignment.status,
-            cod_amount: consignment.cod_amount,
-            delivery_charge: null,
-            last_update: new Date().toISOString(),
-        };
-        const updated = yield prisma_1.prisma.order.update({
+        const shipment = yield (0, courier_dispatch_1.submitOrderToCourier)(orderId, "steadfast");
+        // Re-fetch order with updated courier data
+        const updated = yield prisma_1.prisma.order.findUniqueOrThrow({
             where: { id: orderId },
-            data: { courier: courierData },
             include: { items: true },
         });
         index_1.io.emit("order:updated", updated);
-        return res.json({ message: "Consignment created", courier: courierData });
+        return res.json({ message: "Consignment created", shipment });
     }
     catch (err) {
         console.error("[Courier] dispatchOrder:", err.message);
@@ -91,3 +73,18 @@ const dispatchOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.dispatchOrder = dispatchOrder;
+/** Get the CourierShipment record for an order */
+const getShipment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const orderId = Number(req.params.id);
+        const shipment = yield prisma_1.prisma.courierShipment.findUnique({ where: { orderId } });
+        if (!shipment)
+            return res.status(404).json({ message: "No shipment found for this order" });
+        return res.json({ shipment });
+    }
+    catch (err) {
+        console.error("[Courier] getShipment:", err.message);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.getShipment = getShipment;
