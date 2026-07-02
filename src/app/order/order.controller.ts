@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
+import { Prisma } from "@prisma/client";
 import { io } from "../../index";
 import { submitOrderToCourier } from "../courier/courier.dispatch";
 import { sendOrderConfirmationWhatsApp, sendOrderStatusWhatsApp, sendPaymentWhatsApp } from "../../lib/whatsapp.service";
@@ -395,7 +396,20 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       include: { items: true },
     });
 
-    // Submit to SteadFast on first InReview transition (idempotent)
+    // If order is leaving InReview back to any other status (manually),
+    // delete the existing CourierShipment so it can be re-submitted to
+    // Steadfast if InReview is set again later.
+    if (from === "InReview" && status !== "InReview") {
+      await prisma.courierShipment.deleteMany({ where: { orderId: id } });
+      // Also clear legacy courier JSON so it doesn't show stale data
+      await prisma.order.update({ where: { id }, data: { courier: Prisma.JsonNull } });
+      order = await prisma.order.findUniqueOrThrow({
+        where: { id },
+        include: { items: true },
+      });
+    }
+
+    // Submit to SteadFast on InReview transition (re-submits if previous shipment was cleared)
     if (status === "InReview") {
       try {
         await submitOrderToCourier(id, "steadfast");
